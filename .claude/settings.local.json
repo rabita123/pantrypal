@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.revenuecat.com)",
+      "Bash(xargs ls -la)",
+      "Bash(flutter pub *)",
+      "Bash(pkill -f \"flutter run\")",
+      "Bash(flutter run *)",
+      "WebSearch",
+      "WebFetch(domain:revenueflo.com)"
+    ]
+  }
+}

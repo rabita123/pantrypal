@@ -1,0 +1,67 @@
+name: pantrypal
+description: Smart pantry manager — scan receipts, track expiry, reduce food waste.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Camera & Image
+  camera: ^0.10.5+9
+  image_picker: ^1.1.2
+  image: ^4.2.0
+
+  # OCR
+  google_mlkit_text_recognition: ^0.13.1
+
+  # Local DB
+  sqflite: ^2.3.3+1
+  path: ^1.9.0
+  path_provider: ^2.1.4
+
+  # Subscriptions
+  purchases_flutter: ^8.0.0
+  url_launcher: ^6.3.1
+
+  # State management
+  flutter_bloc: ^8.1.6
+  equatable: ^2.0.5
+
+  # DI
+  get_it: ^8.0.2
+
+  # Notifications
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
+
+  # UI
+  fl_chart: ^0.69.0
+  shimmer: ^3.0.0
+  animations: ^2.0.11
+  flutter_slidable: ^3.1.1
+  cached_network_image: ^3.4.1
+  lottie: ^3.1.3
+
+  # Utilities
+  uuid: ^4.5.1
+  intl: ^0.19.0
+  permission_handler: ^11.3.1
+  shared_preferences: ^2.3.3
+  share_plus: ^10.1.2
+  http: ^1.2.2
+  flutter_secure_storage: ^9.2.2
+
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
