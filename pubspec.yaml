@@ -27,6 +27,9 @@ dependencies:
   purchases_flutter: ^8.0.0
   url_launcher: ^6.3.1
 
+  # Barcode scanning
+  mobile_scanner: ^5.2.3
+
   # State management
   flutter_bloc: ^8.1.6
   equatable: ^2.0.5

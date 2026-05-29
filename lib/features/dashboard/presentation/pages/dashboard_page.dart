@@ -6,7 +6,9 @@ import 'package:pantrypal/features/pantry/presentation/widgets/pantry_item_card.
 import 'package:pantrypal/features/pantry/presentation/pages/pantry_page.dart';
 import 'package:pantrypal/features/pantry/presentation/pages/shopping_page.dart';
 import 'package:pantrypal/features/recipes/presentation/pages/recipes_page.dart';
+import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 import 'package:pantrypal/features/scan/presentation/pages/scan_page.dart';
+import 'package:pantrypal/features/scan/presentation/pages/barcode_scanner_page.dart';
 import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
 import 'package:pantrypal/features/subscription/presentation/paywall_page.dart';
 import 'package:pantrypal/features/subscription/services/subscription_service.dart';
@@ -42,12 +44,11 @@ class _DashboardPageState extends State<DashboardPage> {
           ShoppingPage(),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openScan,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showScanOptions,
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.document_scanner_outlined),
-        label: const Text('Scan Receipt', style: TextStyle(fontWeight: FontWeight.w700)),
+        child: const Icon(Icons.add, size: 28),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
@@ -67,7 +68,62 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  void _openScan() async {
+  void _showScanOptions() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkBorder : AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Add to Pantry',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? AppColors.darkInk : AppColors.ink),
+            ),
+            const SizedBox(height: 16),
+            _ScanOption(
+              icon: Icons.qr_code_scanner,
+              title: 'Scan Barcode',
+              subtitle: 'Point at any product barcode for instant lookup',
+              onTap: () {
+                Navigator.pop(context);
+                _openBarcodeScanner();
+              },
+            ),
+            const SizedBox(height: 10),
+            _ScanOption(
+              icon: Icons.document_scanner_outlined,
+              title: 'Scan Receipt',
+              subtitle: 'Scan a grocery receipt to add multiple items',
+              onTap: () {
+                Navigator.pop(context);
+                _openReceiptScan();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _checkScanAccess() async {
     final service = sl<SubscriptionService>();
     if (!await service.canScan()) {
       if (!mounted) return;
@@ -79,17 +135,43 @@ class _DashboardPageState extends State<DashboardPage> {
           builder: (_) => BlocProvider.value(value: cubit, child: const PaywallPage()),
         ),
       );
+      throw _PaywallShown();
+    }
+  }
+
+  void _openBarcodeScanner() async {
+    try {
+      await _checkScanAccess();
+    } on _PaywallShown {
       return;
     }
+    if (!mounted) return;
+    final item = await Navigator.push<PantryItem>(
+      context,
+      MaterialPageRoute(builder: (_) => const BarcodeScannerPage()),
+    );
+    if (item != null) {
+      final service = sl<SubscriptionService>();
+      await service.incrementScanCount();
+      if (!mounted) return;
+      context.read<PantryBloc>().add(PantryAddItem(item));
+      context.read<SubscriptionCubit>().load();
+    }
+  }
 
+  void _openReceiptScan() async {
+    try {
+      await _checkScanAccess();
+    } on _PaywallShown {
+      return;
+    }
     if (!mounted) return;
     final added = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => const ScanPage()),
     );
-
-    // Only count a scan when items were actually confirmed and added
     if (added == true) {
+      final service = sl<SubscriptionService>();
       await service.incrementScanCount();
       if (!mounted) return;
       context.read<SubscriptionCubit>().load();
@@ -397,6 +479,53 @@ class _StatCard extends StatelessWidget {
             Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? AppColors.darkInk : AppColors.ink)),
             Text(label, style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PaywallShown implements Exception {}
+
+class _ScanOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _ScanOption({required this.icon, required this.title, required this.subtitle, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: isDark ? AppColors.darkCard : AppColors.card,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(color: AppColors.primarySurface, borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: AppColors.primary, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: isDark ? AppColors.darkInk : AppColors.ink)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted)),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios, size: 14, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted),
+            ],
+          ),
         ),
       ),
     );

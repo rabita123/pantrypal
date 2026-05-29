@@ -333,24 +333,27 @@ class _SettingsTile extends StatelessWidget {
         ? AppColors.expired
         : AppColors.primary;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 2),
-      decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Material(
         color: isDark ? AppColors.darkCard : AppColors.card,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: iconColor, size: 22),
-        title: Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: labelColor)),
-        subtitle: subtitle != null
-            ? Text(subtitle!, style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted))
-            : null,
-        trailing: showChevron
-            ? Icon(Icons.chevron_right, color: isDark ? AppColors.darkInkMuted : AppColors.inkLight, size: 20)
-            : null,
-        onTap: onTap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border),
+        ),
+        child: ListTile(
+          leading: Icon(icon, color: iconColor, size: 22),
+          title: Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: labelColor)),
+          subtitle: subtitle != null
+              ? Text(subtitle!, style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted))
+              : null,
+          trailing: showChevron
+              ? Icon(Icons.chevron_right, color: isDark ? AppColors.darkInkMuted : AppColors.inkLight, size: 20)
+              : null,
+          onTap: onTap,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
       ),
     );
   }

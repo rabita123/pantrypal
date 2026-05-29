@@ -17,4 +17,6 @@ Future<void> setupDependencies() async {
   sl.registerLazySingleton<RecipeRepository>(() => RecipeRepository());
   sl.registerFactory<PantryBloc>(() => PantryBloc(sl<PantryRepository>()));
   sl.registerFactory<RecipeBloc>(() => RecipeBloc(sl<RecipeRepository>()));
+
+  await sl<RecipeRepository>().seedIfEmpty();
 }

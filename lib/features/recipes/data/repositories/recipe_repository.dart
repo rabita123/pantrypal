@@ -1,10 +1,21 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
+import 'package:pantrypal/features/recipes/data/recipe_seeds.dart';
 import 'package:pantrypal/features/recipes/domain/entities/recipe.dart';
 
 class RecipeRepository {
   static const _key = 'recipes_v1';
+  static const _seededKey = 'recipes_seeded_v1';
+
+  Future<void> seedIfEmpty() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_seededKey) == true) return;
+    for (final recipe in kSeedRecipes) {
+      await save(recipe);
+    }
+    await prefs.setBool(_seededKey, true);
+  }
 
   Future<List<Recipe>> getAll() async {
     final prefs = await SharedPreferences.getInstance();
