@@ -22,8 +22,9 @@ class GroceryOcrParser {
     // Skip lines with a negative amount (discount/coupon lines)
     final negativePattern = RegExp(r'-\s*\$?\s*\d+[.,]\d');
     final qtyPattern = RegExp(r'^(\d+)\s*[xX@]\s*(.+)');
+    // Also matches OCR misreads: '11b' for 'lb', '0z' for 'oz'
     final weightPattern = RegExp(
-      r'(\d+\.?\d*)\s*(kg|g|lb|lbs|oz|l|ml|L)',
+      r'(\d+\.?\d*)\s*(kg|g|lbs|lb|11b|1b|oz|0z|l|ml|L)',
       caseSensitive: false,
     );
     // Strip pack/count suffixes that aren't real units
@@ -54,7 +55,11 @@ class GroceryOcrParser {
       final weightMatch = weightPattern.firstMatch(name);
       if (weightMatch != null) {
         quantity = double.tryParse(weightMatch.group(1)!) ?? 1.0;
-        unit = weightMatch.group(2)!.toLowerCase();
+        final rawUnit = weightMatch.group(2)!.toLowerCase();
+        // Normalise OCR misreads back to real unit names
+        unit = rawUnit == '11b' || rawUnit == '1b' ? 'lb'
+             : rawUnit == '0z' ? 'oz'
+             : rawUnit;
         name = name.replaceAll(weightMatch.group(0)!, '').trim();
       }
 

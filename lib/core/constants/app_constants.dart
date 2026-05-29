@@ -27,16 +27,15 @@ class AppConstants {
   };
 
   // OCR skip keywords — matched as substrings against lowercased lines.
-  // Keep these SPECIFIC to avoid blocking real product names
-  // (e.g. don't use bare 'store', 'card', 'bag', 'paper' — too broad).
+  // Safe to use bare words that NEVER appear in food product names.
+  // Use specific phrases for words that could appear in product names.
   static const List<String> skipKeywords = [
-    // Totals / summaries
-    'subtotal', 'sub-total',
-    'grand total', ' total ', 'total:', 'total\$',
-    // Tax / payment
-    ' tax ', 'tax:', 'vat ', 'hst ', 'gst ',
-    'change due', 'change:',
-    'amount due', 'amount paid', 'amount tendered',
+    // Summary / totals (never in food names)
+    'total', 'subtotal',
+    // Tax lines
+    'tax', 'vat', 'hst', 'gst',
+    // Payment / transaction
+    'change due', 'amount due', 'amount paid',
     'cash tendered', 'cash back',
     'card payment', 'card tender',
     'visa', 'mastercard', 'amex', 'discover',
@@ -45,14 +44,14 @@ class AppConstants {
     'loyalty card', 'reward point', 'fuel point',
     'member saving', 'member discount',
     'gift card',
-    // Receipt metadata
-    'thank you', 'thank-you',
+    // Receipt metadata (never in food names)
+    'thank you',
     'receipt no', 'receipt #',
     'transaction', 'operator',
-    'store #', 'store no.', 'register #',
+    'store #', 'store no.', 'register #', 'register no',
     'approved', 'authorization',
     // Coupons / discounts
-    'coupon', 'instant save', 'promo saving',
+    'coupon', 'instant save',
     // Address / contact
     '.com', 'tel:', 'fax:',
     'customer service',
