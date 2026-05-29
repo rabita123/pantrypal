@@ -69,6 +69,9 @@ class GroceryOcrParser {
       name = _cleanName(name);
       if (name.length < 2) continue;
       if (_isNonFood(name.toLowerCase())) continue;
+      // Skip bare single-word category names that are almost always OCR
+      // split artefacts (e.g. "Cheese 1.64" from "Cottage Cheese  1.64")
+      if (_isBareCategory(name)) continue;
 
       final category = _guessCategory(name.toLowerCase());
       final shelfLife = AppConstants.defaultShelfLife[category.name] ?? 14;
@@ -150,28 +153,37 @@ class GroceryOcrParser {
     return name.trim();
   }
 
-  static bool _isNonFood(String name) {
-    // Use specific multi-word phrases first to avoid false positives
-    // (e.g. "bag" alone would block "tea bag")
-    const nonFoodPhrases = [
-      'toilet paper', 'paper towel', 'paper plate', 'paper cup',
-      'plastic bag', 'shopping bag', 'garbage bag', 'trash bag',
-      'baby wipe', 'facial wipe', 'wet wipe',
-      'diaper', 'nappy',
-      'shampoo', 'conditioner',
-      'laundry detergent', 'dish soap', 'hand soap', 'body wash',
-      'cleaner', 'bleach', 'disinfectant',
-      'batteries', 'battery',
-      'magazine', 'newspaper',
-      'lottery', 'gift card', 'coupon',
-      'toothpaste', 'toothbrush', 'dental floss',
-      'deodorant', 'antiperspirant',
-      'razor', 'shaving',
-      'bandage', 'band-aid',
-      'napkin', 'serviette',
-      'plastic wrap', 'aluminium foil', 'aluminum foil', 'cling film',
-    ];
-    return nonFoodPhrases.any((phrase) => name.contains(phrase));
+  // Unambiguous non-food single words (never appear in food product names)
+  static final _nonFoodRegex = RegExp(
+    r'\b(toilet|shampoo|conditioner|detergent|bleach|disinfectant|'
+    r'battery|batteries|magazine|newspaper|lottery|'
+    r'toothpaste|toothbrush|mouthwash|floss|'
+    r'deodorant|antiperspirant|razor|shaving|'
+    r'diaper|nappy|sanitary|tampon|'
+    r'bandage|plaster|antiseptic|'
+    r'wipes?|laundry|softener|dryer|'
+    r'napkin|serviette|tissue|towel|'
+    r'foil|cling|sponge|scrubber)\b',
+    caseSensitive: false,
+  );
+
+  static bool _isNonFood(String name) => _nonFoodRegex.hasMatch(name);
+
+  // Single-word names that are just a food category label are almost always
+  // OCR split artefacts — e.g. "Cottage Cheese 1.64" scanned as two lines
+  // produces a spurious "Cheese 1.64" entry.
+  static final _bareCategoryWords = {
+    'cheese', 'milk', 'cream', 'butter', 'yogurt', 'yoghurt',
+    'meat', 'chicken', 'beef', 'pork', 'fish', 'eggs', 'egg',
+    'bread', 'rice', 'pasta', 'flour', 'cereal',
+    'juice', 'water', 'soda', 'coffee', 'tea',
+    'sauce', 'oil', 'sugar', 'salt',
+    'fruit', 'vegetable', 'produce', 'frozen', 'organic',
+  };
+
+  static bool _isBareCategory(String name) {
+    final words = name.trim().split(RegExp(r'\s+'));
+    return words.length == 1 && _bareCategoryWords.contains(words.first.toLowerCase());
   }
 
   static FoodCategory _guessCategory(String name) {
