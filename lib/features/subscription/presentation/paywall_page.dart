@@ -326,7 +326,7 @@ class _PackageOptionsState extends State<_PackageOptions> {
 class _LegalFooter extends StatelessWidget {
   final bool isDark;
   // TODO: replace with your real Terms of Service URL before App Store submission
-  static const _termsUrl = 'https://yoursite.com/terms';
+  static const _termsUrl = 'https://rabita123.github.io/pantrypal/terms';
 
   const _LegalFooter({required this.isDark});
 

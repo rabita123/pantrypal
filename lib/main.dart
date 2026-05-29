@@ -22,9 +22,6 @@ void main() async {
   await setupDependencies();
   await NotificationService.instance.init();
 
-  // TODO: Replace with your RevenueCat API keys from the RevenueCat dashboard
-  // iOS key: Project Settings > API Keys > Apple App Store
-  // Android key: Project Settings > API Keys > Google Play Store
   final rcApiKey =
       Platform.isIOS ? 'appl_vldzueYBTHHQdGdeSsRyRKpEvJN' : 'goog_XXXXXXXXXX';
   await Purchases.configure(PurchasesConfiguration(rcApiKey));

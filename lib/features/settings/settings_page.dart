@@ -12,8 +12,7 @@ import 'package:pantrypal/features/subscription/presentation/paywall_page.dart';
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
-  // TODO: replace with real URLs before App Store submission
-  static const _termsUrl = 'https://yoursite.com/terms';
+  static const _termsUrl = 'https://rabita123.github.io/pantrypal/terms';
   static const _contactEmail = 'tasmin.saira@gmail.com';
 
   @override

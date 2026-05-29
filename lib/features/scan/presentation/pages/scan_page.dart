@@ -6,6 +6,7 @@ import 'package:pantrypal/core/theme/app_theme.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/scan/data/scan_bloc.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class ScanPage extends StatelessWidget {
   const ScanPage({super.key});
@@ -143,9 +144,20 @@ class _CameraViewState extends State<_CameraView> {
               const SizedBox(height: 8),
               const Text('Please enable camera access in\nSettings > PantryPal > Camera', textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 14, height: 1.5)),
               const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: () => openAppSettings(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                ),
+                child: const Text('Open Settings', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(height: 12),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Go Back', style: TextStyle(color: AppColors.primary, fontSize: 16)),
+                child: const Text('Go Back', style: TextStyle(color: Colors.white54, fontSize: 15)),
               ),
             ],
           ),
