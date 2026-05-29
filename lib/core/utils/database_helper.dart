@@ -193,9 +193,9 @@ class DatabaseHelper {
         ) ??
         0;
     final wastedValueRaw = (await db.rawQuery(
-          'SELECT SUM(price) FROM ${AppConstants.itemsTable} WHERE is_wasted=1',
+          'SELECT COALESCE(SUM(price), 0.0) FROM ${AppConstants.itemsTable} WHERE is_wasted=1',
         )).first.values.first;
-    final wastedValue = wastedValueRaw == null ? 0.0 : (wastedValueRaw as num).toDouble();
+    final wastedValue = ((wastedValueRaw as num?) ?? 0).toDouble();
 
     return {
       'total': total,

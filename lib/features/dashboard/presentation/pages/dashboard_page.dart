@@ -271,7 +271,17 @@ class _HomeTab extends StatelessWidget {
     final total = (stats['total'] as int?) ?? 0;
     final expiring = (stats['expiringSoon'] as int?) ?? 0;
     final expired = (stats['expired'] as int?) ?? 0;
-    final wastedVal = (stats['wastedValue'] as double?) ?? 0.0;
+    final wasted = (stats['wasted'] as int?) ?? 0;
+    // Safe cast: SQLite may return int or double for SUM
+    final wastedVal = ((stats['wastedValue'] as num?) ?? 0).toDouble();
+
+    // When items were wasted but have no price (barcode-scanned items),
+    // show the count so the stat is still meaningful
+    final wastedDisplay = wastedVal > 0
+        ? '\$${wastedVal.toStringAsFixed(2)}'
+        : wasted > 0
+            ? '$wasted item${wasted == 1 ? '' : 's'}'
+            : '\$0.00';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -289,7 +299,7 @@ class _HomeTab extends StatelessWidget {
             children: [
               _StatCard(label: 'Expired', value: '$expired items', icon: Icons.warning_amber_outlined, color: AppColors.expired),
               const SizedBox(width: 10),
-              _StatCard(label: 'Wasted value', value: '\$${wastedVal.toStringAsFixed(2)}', icon: Icons.money_off_outlined, color: AppColors.accent),
+              _StatCard(label: 'Wasted', value: wastedDisplay, icon: Icons.money_off_outlined, color: AppColors.accent),
             ],
           ),
         ],
