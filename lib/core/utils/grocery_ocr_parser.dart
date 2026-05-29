@@ -2,9 +2,6 @@ import 'package:pantrypal/core/constants/app_constants.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 
 class GroceryOcrParser {
-  /// Parses raw OCR text from a grocery receipt (or freeform food photo) into food items.
-  /// Tries receipt format first (lines ending with a price), then falls back to
-  /// keyword matching for photos that aren't receipts.
   static List<Map<String, dynamic>> parseReceipt(String rawText) {
     final receiptItems = _parseAsReceipt(rawText);
     if (receiptItems.isNotEmpty) return receiptItems;
@@ -19,13 +16,23 @@ class GroceryOcrParser {
         .toList();
 
     final items = <Map<String, dynamic>>[];
-    final pricePattern = RegExp(r'(\d+[.,]\d{2})\s*$');
+
+    // Allow optional $ prefix, optional trailing tax-code letter (F, T, A, N, O…)
+    final pricePattern = RegExp(r'\$?\s*(\d+[.,]\d{1,2})\s*[A-Z]?\s*$');
+    // Skip lines with a negative amount (discount/coupon lines)
+    final negativePattern = RegExp(r'-\s*\$?\s*\d+[.,]\d');
     final qtyPattern = RegExp(r'^(\d+)\s*[xX@]\s*(.+)');
-    final weightPattern = RegExp(r'(\d+\.?\d*)\s*(kg|g|lb|oz|l|ml|L)', caseSensitive: false);
+    final weightPattern = RegExp(
+      r'(\d+\.?\d*)\s*(kg|g|lb|lbs|oz|l|ml|L)',
+      caseSensitive: false,
+    );
+    // Strip pack/count suffixes that aren't real units
+    final packPattern = RegExp(r'\b\d+\s*(ct|pk|pack|ea|pc|pcs)\b', caseSensitive: false);
 
     for (final line in lines) {
       final lower = line.toLowerCase();
       if (_shouldSkipLine(lower)) continue;
+      if (negativePattern.hasMatch(line)) continue;
 
       final priceMatch = pricePattern.firstMatch(line);
       if (priceMatch == null) continue;
@@ -37,6 +44,7 @@ class GroceryOcrParser {
 
       double quantity = 1.0;
       String unit = 'item';
+
       final qtyMatch = qtyPattern.firstMatch(name);
       if (qtyMatch != null) {
         quantity = double.tryParse(qtyMatch.group(1)!) ?? 1.0;
@@ -49,6 +57,9 @@ class GroceryOcrParser {
         unit = weightMatch.group(2)!.toLowerCase();
         name = name.replaceAll(weightMatch.group(0)!, '').trim();
       }
+
+      // Strip pack/count labels like "12pk", "8ct"
+      name = name.replaceAll(packPattern, '').trim();
 
       name = _cleanName(name);
       if (name.length < 2) continue;
@@ -70,8 +81,6 @@ class GroceryOcrParser {
     return items.take(30).toList();
   }
 
-  /// Fallback for freeform photos (no price pattern required).
-  /// Matches any line that contains a known food keyword.
   static List<Map<String, dynamic>> _parseAsFreeText(String rawText) {
     final lines = rawText
         .split('\n')
@@ -114,67 +123,85 @@ class GroceryOcrParser {
   }
 
   static bool _shouldSkipLine(String lower) {
-    return AppConstants.skipKeywords.any((k) => lower.contains(k)) ||
-        RegExp(r'^\d+$').hasMatch(lower) ||
-        lower.contains('tel:') ||
-        lower.contains('http') ||
-        lower.length < 3;
+    // Pure-digit lines (barcodes, quantities without names)
+    if (RegExp(r'^\d+$').hasMatch(lower)) return true;
+    if (lower.contains('tel:') || lower.contains('http') || lower.contains('www.')) return true;
+    if (lower.length < 3) return true;
+
+    return AppConstants.skipKeywords.any((k) => lower.contains(k));
   }
 
   static String _cleanName(String name) {
     name = name.replaceAll(RegExp(r'[*#@!]'), '');
     // Strip unit-price segments like "à 4.50 CHF" or "@ 22.00 EUR"
-    name = name.replaceAll(RegExp(r'\s*[àa@]\s*\d+[.,]\d+\s*[A-Z]{2,4}', caseSensitive: false), '');
-    // Strip any remaining trailing currency+amount
-    name = name.replaceAll(RegExp(r'\s*\d+[.,]\d+\s*[A-Z]{2,4}', caseSensitive: false), '');
+    name = name.replaceAll(
+        RegExp(r'\s*[àa@]\s*\d+[.,]\d+\s*[A-Z]{2,4}', caseSensitive: false), '');
+    // Strip trailing currency+amount
+    name = name.replaceAll(
+        RegExp(r'\s*\d+[.,]\d+\s*[A-Z]{2,4}', caseSensitive: false), '');
     name = name.replaceAll(RegExp(r'\s*[A-Z]{2,4}\s*$'), '');
     name = name.replaceAll(RegExp(r'\s{2,}'), ' ');
-    name = name.replaceAll(RegExp(r'^\d+\s+'), ''); // leading numbers
+    name = name.replaceAll(RegExp(r'^\d+\s+'), ''); // leading stand-alone number
     return name.trim();
   }
 
   static bool _isNonFood(String name) {
-    const nonFood = [
-      'bag', 'plastic', 'paper', 'napkin', 'tissue', 'soap',
-      'shampoo', 'detergent', 'cleaner', 'bleach', 'batteries',
-      'magazine', 'lottery', 'gift card', 'coupon',
+    // Use specific multi-word phrases first to avoid false positives
+    // (e.g. "bag" alone would block "tea bag")
+    const nonFoodPhrases = [
+      'toilet paper', 'paper towel', 'paper plate', 'paper cup',
+      'plastic bag', 'shopping bag', 'garbage bag', 'trash bag',
+      'baby wipe', 'facial wipe', 'wet wipe',
+      'diaper', 'nappy',
+      'shampoo', 'conditioner',
+      'laundry detergent', 'dish soap', 'hand soap', 'body wash',
+      'cleaner', 'bleach', 'disinfectant',
+      'batteries', 'battery',
+      'magazine', 'newspaper',
+      'lottery', 'gift card', 'coupon',
+      'toothpaste', 'toothbrush', 'dental floss',
+      'deodorant', 'antiperspirant',
+      'razor', 'shaving',
+      'bandage', 'band-aid',
+      'napkin', 'serviette',
+      'plastic wrap', 'aluminium foil', 'aluminum foil', 'cling film',
     ];
-    return nonFood.any((n) => name.contains(n));
+    return nonFoodPhrases.any((phrase) => name.contains(phrase));
   }
 
   static FoodCategory _guessCategory(String name) {
-    if (RegExp(r'milk|cheese|käse|chäss|yogurt|cream|butter|dairy|cheddar|mozzarella|quark|fromage')
+    if (RegExp(r'milk|cheese|yogurt|yoghurt|cream|butter|dairy|cheddar|mozzarella|quark|fromage|egg|eggs|kefir|cottage|ricotta|gouda|brie|feta|parmesan')
         .hasMatch(name)) {
       return FoodCategory.dairy;
     }
-    if (RegExp(r'chicken|beef|pork|schwein|schnitzel|lamb|fish|salmon|tuna|shrimp|meat|steak|sausage|wurst|fleisch|poulet|veal|kalbfl')
+    if (RegExp(r'chicken|beef|pork|lamb|fish|salmon|tuna|shrimp|prawn|meat|steak|sausage|wurst|fleisch|poulet|veal|turkey|bacon|ham|mince|meatball|salami|pepperoni|deli|seafood|tilapia|cod|haddock|crab|lobster|sardine')
         .hasMatch(name)) {
       return FoodCategory.meat;
     }
-    if (RegExp(r'apple|banana|orange|grape|mango|berry|fruit|peach|plum|melon|lemon|lime|obst')
+    if (RegExp(r'apple|banana|orange|grape|mango|berry|fruit|peach|plum|melon|lemon|lime|obst|cherry|pear|kiwi|pineapple|watermelon|strawberr|blueberr|raspberr|blackberr|avocado|fig|date|apricot|nectarine|clementine|grapefruit|pomegranate')
         .hasMatch(name)) {
       return FoodCategory.fruits;
     }
-    if (RegExp(r'lettuce|spinach|broccoli|carrot|potato|kartoffel|onion|tomato|pepper|garlic|cabbage|celery|cucumber|vegetable|veg|salat|gemüse|rösti|spätzli|spaetzle')
+    if (RegExp(r'lettuce|spinach|broccoli|carrot|potato|onion|tomato|pepper|garlic|cabbage|celery|cucumber|vegetable|veg|salad|aubergine|eggplant|courgette|zucchini|asparagus|artichoke|leek|parsnip|turnip|beetroot|beet|radish|kale|chard|arugula|rocket|fennel|mushroom|pea|bean|corn|maize|sweet potato|squash|pumpkin|cauliflower|brussel|sprout|green bean')
         .hasMatch(name)) {
       return FoodCategory.vegetables;
     }
-    if (RegExp(r'bread|brot|rice|pasta|flour|cereal|oat|grain|wheat|noodle|cracker|bagel|tortilla|knödel|gnocchi|pizza|burger|sandwich|toast|brötchen')
+    if (RegExp(r'bread|rice|pasta|flour|cereal|oat|grain|wheat|noodle|cracker|bagel|tortilla|gnocchi|pizza|toast|bun|roll|wrap|pita|croissant|muffin|waffle|pancake|rye|barley|quinoa|couscous|bulgur')
         .hasMatch(name)) {
       return FoodCategory.grains;
     }
-    if (RegExp(r'frozen|ice cream|glace|popsicle').hasMatch(name)) {
+    if (RegExp(r'frozen|ice cream|popsicle|gelato|sorbet').hasMatch(name)) {
       return FoodCategory.frozen;
     }
-    if (RegExp(r'juice|saft|soda|water|wasser|drink|coffee|kaffee|latte|espresso|cappuccino|macchiato|tea|tee|beverage|cola|beer|bier|wein|wine|mineral|limonade|smoothie')
+    if (RegExp(r'juice|soda|water|drink|coffee|tea|beverage|cola|beer|wine|mineral|smoothie|lemonade|sparkling|energy drink|sports drink|kombucha|cider|latte|espresso|cappuccino|cocoa|hot chocolate')
         .hasMatch(name)) {
       return FoodCategory.beverages;
     }
-    if (RegExp(r'chip|crisp|cookie|biscuit|candy|chocolate|schokolad|snack|popcorn|pretzel|kuchen|cake|torte|dessert|tiramisu|mousse')
+    if (RegExp(r'chip|crisp|cookie|biscuit|candy|chocolate|snack|popcorn|pretzel|cake|dessert|sweets|gummy|lollipop|toffee|fudge|brownie|bar|granola bar|protein bar|nut|peanut|almond|cashew|walnut|pistachio|trail mix|dried fruit|raisin|cranberry')
         .hasMatch(name)) {
       return FoodCategory.snacks;
     }
-    if (RegExp(r'sauce|ketchup|mustard|senf|mayo|vinegar|essig|oil|öl|dressing|seasoning|spice|salt|pepper|herb|gewürz|suppe|soup')
+    if (RegExp(r'sauce|ketchup|mustard|mayo|vinegar|oil|dressing|seasoning|spice|salt|herb|soup|stock|broth|gravy|jam|jelly|honey|syrup|peanut butter|almond butter|tahini|hummus|salsa|chutney|relish|marinade|soy sauce|hot sauce|bbq|curry|paste|miso')
         .hasMatch(name)) {
       return FoodCategory.condiments;
     }

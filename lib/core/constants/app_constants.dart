@@ -26,22 +26,50 @@ class AppConstants {
     'other': 14,
   };
 
-  // OCR parsing keywords
+  // OCR skip keywords — matched as substrings against lowercased lines.
+  // Keep these SPECIFIC to avoid blocking real product names
+  // (e.g. don't use bare 'store', 'card', 'bag', 'paper' — too broad).
   static const List<String> skipKeywords = [
-    'total', 'subtotal', 'tax', 'change', 'cash', 'card',
-    'thank', 'visit', 'receipt', 'store', 'phone', 'www',
-    'discount', 'savings', 'balance', 'tender', 'approve',
+    // Totals / summaries
+    'subtotal', 'sub-total',
+    'grand total', ' total ', 'total:', 'total\$',
+    // Tax / payment
+    ' tax ', 'tax:', 'vat ', 'hst ', 'gst ',
+    'change due', 'change:',
+    'amount due', 'amount paid', 'amount tendered',
+    'cash tendered', 'cash back',
+    'card payment', 'card tender',
+    'visa', 'mastercard', 'amex', 'discover',
+    'debit', 'credit card',
+    // Loyalty / rewards
+    'loyalty card', 'reward point', 'fuel point',
+    'member saving', 'member discount',
+    'gift card',
+    // Receipt metadata
+    'thank you', 'thank-you',
+    'receipt no', 'receipt #',
+    'transaction', 'operator',
+    'store #', 'store no.', 'register #',
+    'approved', 'authorization',
+    // Coupons / discounts
+    'coupon', 'instant save', 'promo saving',
+    // Address / contact
+    '.com', 'tel:', 'fax:',
+    'customer service',
   ];
 
-  // Common grocery items for fuzzy matching
+  // Common grocery items for fuzzy matching (freetext fallback)
   static const List<String> commonItems = [
-    'milk', 'eggs', 'bread', 'butter', 'cheese', 'yogurt',
-    'chicken', 'beef', 'pork', 'fish', 'salmon', 'tuna',
-    'apple', 'banana', 'orange', 'tomato', 'potato', 'onion',
-    'carrot', 'spinach', 'lettuce', 'broccoli', 'cucumber',
-    'rice', 'pasta', 'flour', 'sugar', 'salt', 'oil',
-    'coffee', 'tea', 'juice', 'water', 'soda',
-    'cereal', 'oats', 'crackers', 'chips', 'cookies',
-    'ketchup', 'mustard', 'mayo', 'sauce', 'vinegar',
+    'milk', 'egg', 'eggs', 'bread', 'butter', 'cheese', 'yogurt', 'yoghurt',
+    'chicken', 'beef', 'pork', 'lamb', 'fish', 'salmon', 'tuna', 'turkey', 'bacon', 'ham',
+    'apple', 'banana', 'orange', 'tomato', 'potato', 'onion', 'avocado', 'berry', 'mango',
+    'carrot', 'spinach', 'lettuce', 'broccoli', 'cucumber', 'pepper', 'garlic', 'celery',
+    'aubergine', 'eggplant', 'courgette', 'zucchini', 'mushroom', 'asparagus', 'kale',
+    'rice', 'pasta', 'flour', 'sugar', 'salt', 'oil', 'oats', 'cereal', 'noodle',
+    'coffee', 'tea', 'juice', 'water', 'soda', 'milk',
+    'crackers', 'chips', 'cookies', 'chocolate', 'snack', 'granola',
+    'ketchup', 'mustard', 'mayo', 'sauce', 'vinegar', 'honey', 'jam', 'syrup',
+    'soup', 'stock', 'broth', 'hummus', 'salsa',
+    'canned', 'frozen', 'organic', 'fresh',
   ];
 }
