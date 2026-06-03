@@ -31,8 +31,6 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>PantryPal needs camera access to scan your grocery receipts and add items to your pantry.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>PantryPal needs permission to save images.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>PantryPal needs photo library access to import receipt photos.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
@@ -41,6 +39,8 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>UIRequiresFullScreen</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
