@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:pantrypal/core/utils/grocery_ocr_parser.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
+import 'package:pantrypal/features/scan/data/receipt_scan_service.dart';
 import 'package:uuid/uuid.dart';
 
 abstract class ScanEvent extends Equatable {
@@ -33,8 +34,9 @@ class ScanProcessing extends ScanState {}
 class ScanReviewReady extends ScanState {
   final List<Map<String, dynamic>> parsedItems;
   final Set<int> selectedIndices;
-  ScanReviewReady(this.parsedItems, this.selectedIndices);
-  @override List<Object?> get props => [parsedItems, selectedIndices];
+  final bool isOfflineFallback;
+  ScanReviewReady(this.parsedItems, this.selectedIndices, {this.isOfflineFallback = false});
+  @override List<Object?> get props => [parsedItems, selectedIndices, isOfflineFallback];
 }
 class ScanError extends ScanState {
   final String message;
@@ -53,8 +55,24 @@ class ScanBloc extends Bloc<ScanEvent, ScanState> {
     on<ScanUpdateItem>(_onUpdateItem);
   }
 
-  Future<void> _onImageSelected(ScanImageSelected event, Emitter<ScanState> emit) async {
+  Future<void> _onImageSelected(
+      ScanImageSelected event, Emitter<ScanState> emit) async {
     emit(ScanProcessing());
+
+    // 1. Try Claude Vision — fails fast if offline (SocketException)
+    try {
+      final parsed = await ReceiptScanService.analyzeReceipt(event.imagePath);
+      if (parsed.isNotEmpty) {
+        emit(ScanReviewReady(
+            parsed, Set<int>.from(List.generate(parsed.length, (i) => i)),
+            isOfflineFallback: false));
+        return;
+      }
+    } catch (_) {
+      // Offline or API error — fall through to local OCR
+    }
+
+    // 2. Offline fallback: local MLKit OCR + parser ─────────────────────────
     try {
       _recognizer ??= TextRecognizer();
       final inputImage = InputImage.fromFilePath(event.imagePath);
@@ -62,13 +80,14 @@ class ScanBloc extends Bloc<ScanEvent, ScanState> {
       final parsed = GroceryOcrParser.parseReceipt(recognized.text);
 
       if (parsed.isEmpty) {
-        emit(ScanError('No food items detected. Try a clearer photo of the grocery receipt.'));
+        emit(ScanError(
+            'No food items detected. Try a clearer photo with good lighting.'));
         return;
       }
 
-      // Pre-select all items
-      final selected = Set<int>.from(List.generate(parsed.length, (i) => i));
-      emit(ScanReviewReady(parsed, selected));
+      emit(ScanReviewReady(
+          parsed, Set<int>.from(List.generate(parsed.length, (i) => i)),
+          isOfflineFallback: true));
     } catch (e) {
       emit(ScanError('Could not process image: ${e.toString()}'));
     }

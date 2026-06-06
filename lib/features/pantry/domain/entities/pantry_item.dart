@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 
 enum FoodCategory {
   dairy('Dairy', '🥛', 0xFF1976D2),
+  eggs('Eggs', '🥚', 0xFFFFA000),
   meat('Meat & Fish', '🥩', 0xFFC62828),
   vegetables('Vegetables', '🥦', 0xFF388E3C),
   fruits('Fruits', '🍎', 0xFFE65100),

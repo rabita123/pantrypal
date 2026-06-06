@@ -288,7 +288,7 @@ class DatabaseHelper {
         unit: m['unit'] as String,
         expiryDate: DateTime.fromMillisecondsSinceEpoch(m['expiry_date'] as int),
         addedDate: DateTime.fromMillisecondsSinceEpoch(m['added_date'] as int),
-        price: m['price'] as double?,
+        price: (m['price'] as num?)?.toDouble(),
         barcode: m['barcode'] as String?,
         imageUrl: m['image_url'] as String?,
         notes: m['notes'] as String?,

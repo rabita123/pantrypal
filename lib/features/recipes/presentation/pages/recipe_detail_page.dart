@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pantrypal/core/theme/app_theme.dart';
+import 'package:pantrypal/core/utils/food_emoji.dart';
 import 'package:pantrypal/features/recipes/domain/entities/recipe.dart';
 import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
 import 'package:pantrypal/features/recipes/presentation/pages/add_recipe_page.dart';
+import 'package:share_plus/share_plus.dart';
 
 class RecipeDetailPage extends StatefulWidget {
   final Recipe recipe;
@@ -47,6 +49,11 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                   context.read<RecipeBloc>().add(RecipeToggleFavorite(recipe.id));
                   Navigator.pop(context);
                 },
+              ),
+              IconButton(
+                icon: const Icon(Icons.share_outlined, color: Colors.white),
+                onPressed: () => _shareRecipe(context, recipe),
+                tooltip: 'Share recipe',
               ),
               IconButton(
                 icon: const Icon(Icons.edit_outlined, color: Colors.white),
@@ -231,7 +238,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Row(
                         children: [
-                          Text(ing.category.emoji, style: const TextStyle(fontSize: 20)),
+                          Text(foodEmoji(ing.name, ing.category), style: const TextStyle(fontSize: 20)),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
@@ -315,6 +322,30 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
           ),
         ],
       ),
+    );
+  }
+
+  void _shareRecipe(BuildContext ctx, Recipe recipe) {
+    final buf = StringBuffer('🍳 ${recipe.name}\n\n');
+    buf.writeln('${recipe.timeLabel}  •  ${recipe.cuisine.label}  •  $_servings servings\n');
+    buf.writeln('Ingredients:');
+    for (final ing in recipe.ingredients) {
+      final scaled = ing.scaleBy(_scale);
+      buf.writeln('• ${ing.name} — ${scaled.displayQuantity} ${scaled.unit}');
+    }
+    if (recipe.steps.isNotEmpty) {
+      buf.writeln('\nInstructions:');
+      for (var i = 0; i < recipe.steps.length; i++) {
+        buf.writeln('${i + 1}. ${recipe.steps[i]}');
+      }
+    }
+    final box = ctx.findRenderObject() as RenderBox?;
+    Share.share(
+      buf.toString().trim(),
+      subject: recipe.name,
+      sharePositionOrigin: box != null
+          ? box.localToGlobal(Offset.zero) & box.size
+          : const Rect.fromLTWH(0, 0, 100, 50),
     );
   }
 

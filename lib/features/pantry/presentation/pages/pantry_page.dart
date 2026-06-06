@@ -104,6 +104,20 @@ class _PantryPageState extends State<PantryPage> {
                         onConsumed: () => context.read<PantryBloc>().add(PantryMarkConsumed(item.id)),
                         onWasted: () => context.read<PantryBloc>().add(PantryMarkWasted(item.id)),
                         onDelete: () => context.read<PantryBloc>().add(PantryDeleteItem(item.id)),
+                        onFreeze: () {
+                          final frozen = item.copyWith(
+                            location: StorageLocation.freezer,
+                            expiryDate: DateTime.now().add(const Duration(days: 90)),
+                          );
+                          context.read<PantryBloc>().add(PantryUpdateItem(frozen));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${item.name} moved to freezer ❄️'),
+                              backgroundColor: const Color(0xFF1565C0),
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        },
                       );
                     },
                   );
@@ -136,7 +150,7 @@ class _PantryPageState extends State<PantryPage> {
       backgroundColor: Colors.transparent,
       builder: (_) => AddItemDialog(existing: existing),
     );
-    if (item != null && mounted) {
+    if (item != null && context.mounted) {
       context.read<PantryBloc>().add(PantryUpdateItem(item));
     }
   }

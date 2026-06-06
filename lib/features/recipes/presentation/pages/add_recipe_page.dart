@@ -368,7 +368,7 @@ class _IngredientRow extends StatelessWidget {
   final VoidCallback? onRemove;
   final VoidCallback onChanged;
 
-  static const _units = ['item', 'g', 'kg', 'ml', 'L', 'cup', 'tbsp', 'tsp', 'oz', 'lb', 'piece', 'bunch', 'slice', 'can'];
+  static const _units = ['item', 'pcs', 'g', 'kg', 'ml', 'L', 'cup', 'tbsp', 'tsp', 'oz', 'lb', 'piece', 'pack', 'bunch', 'slice', 'can', 'bottle', 'box', 'bag'];
 
   const _IngredientRow({
     super.key,
@@ -438,7 +438,7 @@ class _IngredientRow extends StatelessWidget {
               const SizedBox(width: 6),
               // Unit
               DropdownButton<String>(
-                value: row.unit,
+                value: _units.contains(row.unit) ? row.unit : 'item',
                 underline: const SizedBox.shrink(),
                 isDense: true,
                 items: _units.map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 13)))).toList(),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:intl/intl.dart';
 import 'package:pantrypal/core/theme/app_theme.dart';
+import 'package:pantrypal/core/utils/food_emoji.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 
 class PantryItemCard extends StatelessWidget {
@@ -10,6 +11,7 @@ class PantryItemCard extends StatelessWidget {
   final VoidCallback? onConsumed;
   final VoidCallback? onWasted;
   final VoidCallback? onDelete;
+  final VoidCallback? onFreeze;
 
   const PantryItemCard({
     super.key,
@@ -18,6 +20,7 @@ class PantryItemCard extends StatelessWidget {
     this.onConsumed,
     this.onWasted,
     this.onDelete,
+    this.onFreeze,
   });
 
   @override
@@ -100,7 +103,7 @@ class PantryItemCard extends StatelessWidget {
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    item.category.emoji,
+                    foodEmoji(item.name, item.category),
                     style: const TextStyle(fontSize: 22),
                   ),
                 ),
@@ -144,6 +147,17 @@ class PantryItemCard extends StatelessWidget {
                               color: AppColors.inkMuted,
                             ),
                           ),
+                          if (item.price != null) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              '\$${item.price!.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],
@@ -184,6 +198,36 @@ class PantryItemCard extends StatelessWidget {
                         color: AppColors.inkLight,
                       ),
                     ),
+                    if (onFreeze != null &&
+                        item.daysUntilExpiry <= 1 &&
+                        item.location != StorageLocation.freezer) ...[
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: onFreeze,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE3F2FD),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('❄️', style: TextStyle(fontSize: 11)),
+                              SizedBox(width: 3),
+                              Text(
+                                'Freeze',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1565C0),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,9 +30,13 @@ class SubscriptionService {
 
   Future<bool> isPremium() async {
     try {
+      await Purchases.invalidateCustomerInfoCache();
       final info = await Purchases.getCustomerInfo();
-      return info.entitlements.active.containsKey('premium');
-    } catch (_) {
+      final activeKeys = info.entitlements.active.keys.toList();
+      debugPrint('[SubscriptionService] active entitlements: $activeKeys');
+      return info.entitlements.active.containsKey('pantryprn');
+    } catch (e) {
+      debugPrint('[SubscriptionService] isPremium error: $e');
       return false;
     }
   }

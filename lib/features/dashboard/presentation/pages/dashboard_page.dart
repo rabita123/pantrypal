@@ -16,6 +16,11 @@ import 'package:pantrypal/injection_container.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:pantrypal/features/settings/settings_page.dart';
 import 'package:pantrypal/features/recipes/presentation/pages/cook_tonight_page.dart';
+import 'package:pantrypal/shared/services/notification_service.dart';
+import 'package:pantrypal/features/scan/presentation/pages/fridge_scan_page.dart';
+import 'package:pantrypal/features/kids/presentation/pages/kids_meal_planner_page.dart';
+import 'package:pantrypal/features/recipes/presentation/pages/ai_recipe_page.dart';
+import 'package:share_plus/share_plus.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -30,10 +35,20 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     context.read<PantryBloc>().add(PantryLoad());
+    NotificationService.onNotificationTap = () {
+      if (mounted) setState(() => _tab = 2); // Recipes tab
+    };
+  }
+
+  @override
+  void dispose() {
+    NotificationService.onNotificationTap = null;
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: IndexedStack(
         index: _tab,
@@ -42,28 +57,48 @@ class _DashboardPageState extends State<DashboardPage> {
           PantryPage(),
           RecipesPage(),
           ShoppingPage(),
+          SettingsPage(),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: _tab == 3 ? null : FloatingActionButton(
         onPressed: _showScanOptions,
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         child: const Icon(Icons.add, size: 28),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _NavBtn(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home', index: 0, current: _tab, onTap: () => setState(() => _tab = 0)),
-            _NavBtn(icon: Icons.kitchen_outlined, activeIcon: Icons.kitchen, label: 'Pantry', index: 1, current: _tab, onTap: () => setState(() => _tab = 1)),
-            const SizedBox(width: 72),
-            _NavBtn(icon: Icons.menu_book_outlined, activeIcon: Icons.menu_book, label: 'Recipes', index: 2, current: _tab, onTap: () => setState(() => _tab = 2)),
-            _NavBtn(icon: Icons.shopping_cart_outlined, activeIcon: Icons.shopping_cart, label: 'Shopping', index: 3, current: _tab, onTap: () => setState(() => _tab = 3)),
-          ],
-        ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (i) => setState(() => _tab = i),
+        backgroundColor: isDark ? AppColors.darkCard : AppColors.card,
+        indicatorColor: AppColors.primarySurface,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home, color: AppColors.primary),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.kitchen_outlined),
+            selectedIcon: Icon(Icons.kitchen, color: AppColors.primary),
+            label: 'Pantry',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book, color: AppColors.primary),
+            label: 'Recipes',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.shopping_cart_outlined),
+            selectedIcon: Icon(Icons.shopping_cart, color: AppColors.primary),
+            label: 'Shopping',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings, color: AppColors.primary),
+            label: 'Settings',
+          ),
+        ],
       ),
     );
   }
@@ -73,51 +108,63 @@ class _DashboardPageState extends State<DashboardPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkCard : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkBorder : AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
+      builder: (ctx) => SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkCard : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.darkBorder : AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Add to Pantry',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? AppColors.darkInk : AppColors.ink),
-            ),
-            const SizedBox(height: 16),
-            _ScanOption(
-              icon: Icons.qr_code_scanner,
-              title: 'Scan Barcode',
-              subtitle: 'Point at any product barcode for instant lookup',
-              onTap: () {
-                Navigator.pop(context);
-                _openBarcodeScanner();
-              },
-            ),
-            const SizedBox(height: 10),
-            _ScanOption(
-              icon: Icons.document_scanner_outlined,
-              title: 'Scan Receipt',
-              subtitle: 'Scan a grocery receipt to add multiple items',
-              onTap: () {
-                Navigator.pop(context);
-                _openReceiptScan();
-              },
-            ),
-          ],
+              const SizedBox(height: 20),
+              Text(
+                'Add to Pantry',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? AppColors.darkInk : AppColors.ink),
+              ),
+              const SizedBox(height: 12),
+              _ScanOption(
+                icon: Icons.camera_alt_outlined,
+                title: 'Scan Fridge',
+                subtitle: 'Photo your open fridge — AI detects everything inside',
+                onTap: () {
+                  Navigator.pop(context);
+                  _openFridgeScan();
+                },
+              ),
+              const SizedBox(height: 8),
+              _ScanOption(
+                icon: Icons.qr_code_scanner,
+                title: 'Scan Barcode',
+                subtitle: 'Point at any product barcode for instant lookup',
+                onTap: () {
+                  Navigator.pop(context);
+                  _openBarcodeScanner();
+                },
+              ),
+              const SizedBox(height: 8),
+              _ScanOption(
+                icon: Icons.document_scanner_outlined,
+                title: 'Scan Receipt',
+                subtitle: 'Scan a grocery receipt to add multiple items',
+                onTap: () {
+                  Navigator.pop(context);
+                  _openReceiptScan();
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -159,6 +206,26 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  void _openFridgeScan() async {
+    try {
+      await _checkScanAccess();
+    } on _PaywallShown {
+      return;
+    }
+    if (!mounted) return;
+    final added = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const FridgeScanPage()),
+    );
+    if (added == true) {
+      final service = sl<SubscriptionService>();
+      await service.incrementScanCount();
+      if (!mounted) return;
+      context.read<SubscriptionCubit>().load();
+      context.read<PantryBloc>().add(PantryLoad());
+    }
+  }
+
   void _openReceiptScan() async {
     try {
       await _checkScanAccess();
@@ -180,32 +247,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-class _NavBtn extends StatelessWidget {
-  final IconData icon, activeIcon;
-  final String label;
-  final int index, current;
-  final VoidCallback onTap;
-  const _NavBtn({required this.icon, required this.activeIcon, required this.label, required this.index, required this.current, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final active = index == current;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(active ? activeIcon : icon, color: active ? AppColors.primary : AppColors.inkLight),
-            Text(label, style: TextStyle(fontSize: 11, color: active ? AppColors.primary : AppColors.inkLight, fontWeight: active ? FontWeight.w700 : FontWeight.w500)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ── Home Tab ──────────────────────────────────────────────────────────────────
 
 class _HomeTab extends StatelessWidget {
@@ -224,7 +265,7 @@ class _HomeTab extends StatelessWidget {
             return CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(child: _buildHeader(context, isDark)),
-                SliverToBoxAdapter(child: _buildStats(state, isDark)),
+                SliverToBoxAdapter(child: _buildStats(context, state, isDark)),
                 SliverToBoxAdapter(child: _buildCookTonight(context, isDark)),
                 if (state.expiringItems.isNotEmpty)
                   SliverToBoxAdapter(child: _buildExpiringSection(context, state, isDark)),
@@ -243,30 +284,65 @@ class _HomeTab extends StatelessWidget {
     final hour = DateTime.now().hour;
     final greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 12, 8),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('$greeting 👋', style: TextStyle(fontSize: 14, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted)),
-                const SizedBox(height: 4),
-                Text('PantryPal', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: isDark ? AppColors.darkInk : AppColors.ink)),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: Icon(Icons.info_outline, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage())),
-          ),
+          Text('$greeting 👋', style: TextStyle(fontSize: 14, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted)),
+          const SizedBox(height: 4),
+          Text('PantryPal', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: isDark ? AppColors.darkInk : AppColors.ink)),
         ],
       ),
     );
   }
 
-  Widget _buildStats(PantryLoaded state, bool isDark) {
+  void _shareStats(BuildContext ctx, PantryLoaded state) {
+    final stats = state.stats;
+    final total = (stats['total'] as int?) ?? 0;
+    final expiring = (stats['expiringSoon'] as int?) ?? 0;
+    final expired = (stats['expired'] as int?) ?? 0;
+    final wasted = (stats['wasted'] as int?) ?? 0;
+    final wastedVal = ((stats['wastedValue'] as num?) ?? 0).toDouble();
+    final wastedDisplay = wastedVal > 0
+        ? '\$${wastedVal.toStringAsFixed(2)}'
+        : '$wasted item${wasted == 1 ? '' : 's'}';
+    final buf = StringBuffer('📊 PantryPal Monthly Report\n\n');
+    buf.writeln('🥫 In pantry: $total items');
+    buf.writeln('⏰ Expiring soon: $expiring items');
+    buf.writeln('⚠️ Expired: $expired items');
+    buf.writeln('💸 Wasted: $wastedDisplay');
+    final box = ctx.findRenderObject() as RenderBox?;
+    Share.share(
+      buf.toString().trim(),
+      subject: 'PantryPal Monthly Report',
+      sharePositionOrigin: box != null
+          ? box.localToGlobal(Offset.zero) & box.size
+          : const Rect.fromLTWH(0, 0, 100, 50),
+    );
+  }
+
+  void _shareExpiry(BuildContext ctx, List<PantryItem> items) {
+    final buf = StringBuffer('⏰ Expiry Alert from PantryPal\n\n');
+    for (final item in items) {
+      final days = item.expiryDate.difference(DateTime.now()).inDays;
+      final when = days <= 0
+          ? ' — expired!'
+          : days == 1
+              ? ' — expires tomorrow'
+              : ' — expires in $days days';
+      buf.writeln('• ${item.name}$when');
+    }
+    final box = ctx.findRenderObject() as RenderBox?;
+    Share.share(
+      buf.toString().trim(),
+      subject: 'Expiry Alert',
+      sharePositionOrigin: box != null
+          ? box.localToGlobal(Offset.zero) & box.size
+          : const Rect.fromLTWH(0, 0, 100, 50),
+    );
+  }
+
+  Widget _buildStats(BuildContext context, PantryLoaded state, bool isDark) {
     final stats = state.stats;
     final total = (stats['total'] as int?) ?? 0;
     final expiring = (stats['expiringSoon'] as int?) ?? 0;
@@ -289,6 +365,22 @@ class _HomeTab extends StatelessWidget {
         children: [
           Row(
             children: [
+              Text('Monthly Stats',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: isDark ? AppColors.darkInk : AppColors.ink)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.share_outlined, size: 20),
+                color: AppColors.inkLight,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => _shareStats(context, state),
+                tooltip: 'Share report',
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
               _StatCard(label: 'In pantry', value: '$total items', icon: Icons.kitchen_outlined, color: AppColors.primary),
               const SizedBox(width: 10),
               _StatCard(label: 'Expiring soon', value: '$expiring items', icon: Icons.timer_outlined, color: AppColors.expiringSoon),
@@ -308,41 +400,140 @@ class _HomeTab extends StatelessWidget {
   }
 
   Widget _buildCookTonight(BuildContext context, bool isDark) {
+    final pantryState = context.read<PantryBloc>().state;
+    final pantryItems = pantryState is PantryLoaded ? pantryState.items : <PantryItem>[];
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const CookTonightPage()),
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AppColors.primary, AppColors.primaryDark],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      child: Column(
+        children: [
+          // Classic recipe match
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CookTonightPage())),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Row(
+                children: [
+                  Text('🍳', style: TextStyle(fontSize: 32)),
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('What can I cook tonight?', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                        SizedBox(height: 3),
+                        Text('Match recipes to your pantry', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 16),
+                ],
+              ),
             ),
-            borderRadius: BorderRadius.circular(16),
           ),
-          child: const Row(
-            children: [
-              Text('🍳', style: TextStyle(fontSize: 32)),
-              SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('What can I cook tonight?', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
-                    SizedBox(height: 3),
-                    Text('See recipes you can make right now', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                  ],
+          const SizedBox(height: 10),
+          // Kids Meal Planner
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const KidsMealPlannerPage()),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkCard : AppColors.card,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: const Color(0xFFFF8F00).withValues(alpha: 0.4),
                 ),
               ),
-              Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 16),
-            ],
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text('👨‍👩‍👧', style: TextStyle(fontSize: 24)),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Kids Meal Planner',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? AppColors.darkInk : AppColors.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        const Text(
+                          "Plan the week's meals for little ones",
+                          style: TextStyle(color: AppColors.inkMuted, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios,
+                      color: AppColors.inkLight, size: 16),
+                ],
+              ),
+            ),
           ),
-        ),
+          const SizedBox(height: 10),
+          // AI Recipe Generator
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => AIRecipePage(pantryItems: pantryItems)),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkCard : AppColors.card,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(color: AppColors.primarySurface, borderRadius: BorderRadius.circular(12)),
+                    child: const Center(child: Text('✨', style: TextStyle(fontSize: 24))),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Generate Smart Recipe', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? AppColors.darkInk : AppColors.ink)),
+                        const SizedBox(height: 3),
+                        const Text('Claude creates a recipe from your expiring items', style: TextStyle(color: AppColors.inkMuted, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, color: AppColors.inkLight, size: 16),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -373,6 +564,14 @@ class _HomeTab extends StatelessWidget {
                   ],
                 ),
               ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.share_outlined, size: 18, color: AppColors.expiringSoon),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => _shareExpiry(context, state.expiringItems),
+                tooltip: 'Share expiry alert',
+              ),
             ],
           ),
         ),
@@ -382,6 +581,7 @@ class _HomeTab extends StatelessWidget {
                 item: item,
                 onConsumed: () => context.read<PantryBloc>().add(PantryMarkConsumed(item.id)),
                 onWasted: () => context.read<PantryBloc>().add(PantryMarkWasted(item.id)),
+                onFreeze: () => _freezeItem(context, item),
               ),
             )),
       ],
@@ -459,6 +659,21 @@ class _HomeTab extends StatelessWidget {
             const Text('Scan a grocery receipt to add items instantly.', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: AppColors.inkMuted, height: 1.5)),
           ],
         ),
+      ),
+    );
+  }
+
+  void _freezeItem(BuildContext context, PantryItem item) {
+    final frozen = item.copyWith(
+      location: StorageLocation.freezer,
+      expiryDate: DateTime.now().add(const Duration(days: 90)),
+    );
+    context.read<PantryBloc>().add(PantryUpdateItem(frozen));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${item.name} moved to freezer — good for 90 days ❄️'),
+        backgroundColor: const Color(0xFF1565C0),
+        duration: const Duration(seconds: 3),
       ),
     );
   }

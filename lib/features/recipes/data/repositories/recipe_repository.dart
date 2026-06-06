@@ -7,14 +7,23 @@ import 'package:pantrypal/features/recipes/domain/entities/recipe.dart';
 class RecipeRepository {
   static const _key = 'recipes_v1';
   static const _seededKey = 'recipes_seeded_v1';
+  static const _kidsSeededKey = 'kids_recipes_seeded_v1';
 
   Future<void> seedIfEmpty() async {
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_seededKey) == true) return;
-    for (final recipe in kSeedRecipes) {
-      await save(recipe);
+    if (prefs.getBool(_seededKey) != true) {
+      for (final recipe in kSeedRecipes) {
+        await save(recipe);
+      }
+      await prefs.setBool(_seededKey, true);
     }
-    await prefs.setBool(_seededKey, true);
+    // Seed kid recipes for both new and existing users
+    if (prefs.getBool(_kidsSeededKey) != true) {
+      for (final recipe in kKidSeedRecipes) {
+        await save(recipe);
+      }
+      await prefs.setBool(_kidsSeededKey, true);
+    }
   }
 
   Future<List<Recipe>> getAll() async {

@@ -52,7 +52,10 @@ class OpenFoodFactsService {
 
   static FoodCategory _mapCategory(List<String> tags) {
     final joined = tags.join(' ').toLowerCase();
-    if (_has(joined, ['milk', 'dairy', 'cheese', 'yogurt', 'butter', 'cream', 'egg'])) {
+    if (_has(joined, ['egg', 'eggs'])) {
+      return FoodCategory.eggs;
+    }
+    if (_has(joined, ['milk', 'dairy', 'cheese', 'yogurt', 'butter', 'cream'])) {
       return FoodCategory.dairy;
     }
     if (_has(joined, ['meat', 'beef', 'chicken', 'pork', 'fish', 'seafood', 'lamb', 'poultry'])) {
@@ -82,6 +85,7 @@ class OpenFoodFactsService {
   static int _estimateExpiry(List<String> tags) {
     final joined = tags.join(' ').toLowerCase();
     if (_has(joined, ['fresh', 'meat', 'fish', 'seafood'])) return 3;
+    if (_has(joined, ['egg', 'eggs'])) return 21;
     if (_has(joined, ['dairy', 'milk', 'yogurt'])) return 7;
     if (_has(joined, ['vegetable', 'fruit', 'produce'])) return 7;
     if (_has(joined, ['bread', 'bakery'])) return 5;

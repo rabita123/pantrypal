@@ -84,6 +84,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
   void _showConfirmSheet(OpenFoodFactsProduct product, String barcode) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     int expiryDays = product.estimatedExpiryDays;
+    final priceCtrl = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -178,6 +179,27 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
                   _ExpiryChip(label: '1 month', days: 30, selected: expiryDays == 30, onTap: () => setSheetState(() => expiryDays = 30)),
                 ],
               ),
+              const SizedBox(height: 16),
+
+              // Price field
+              TextField(
+                controller: priceCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Price paid (optional)',
+                  prefixIcon: const Icon(Icons.attach_money_outlined),
+                  filled: true,
+                  fillColor: isDark ? AppColors.darkBg : AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border),
+                  ),
+                ),
+              ),
               const SizedBox(height: 20),
 
               // Add button
@@ -197,6 +219,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
                       addedDate: DateTime.now(),
                       imageUrl: product.imageUrl,
                       barcode: barcode,
+                      price: double.tryParse(priceCtrl.text),
                       isConsumed: false,
                       isWasted: false,
                     );
@@ -229,6 +252,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
         ),
       ),
     ).then((_) {
+      priceCtrl.dispose();
       if (_processing && mounted) {
         _controller.start();
         setState(() => _processing = false);

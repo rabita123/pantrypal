@@ -378,18 +378,50 @@ class _ProcessingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Colors.black,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.surface,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: AppColors.primary),
-            SizedBox(height: 24),
-            Text('Reading your receipt…', style: TextStyle(color: Colors.white, fontSize: 16)),
-            SizedBox(height: 8),
-            Text('Detecting food items', style: TextStyle(color: Colors.white38, fontSize: 13)),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: AppColors.primarySurface,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                    strokeWidth: 3,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
+              Text(
+                'Analysing your receipt…',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppColors.darkInk : AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'AI is identifying food items.\nThis takes a few seconds.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -426,6 +458,29 @@ class _ReviewView extends StatelessWidget {
       ),
       body: Column(
         children: [
+          // Offline fallback warning
+          if (state.isOfflineFallback)
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.expiringSoonSurface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.expiringSoon.withValues(alpha: 0.4)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.wifi_off, size: 16, color: AppColors.expiringSoon),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Offline mode — results may be less accurate. Tap ✏️ to correct any item.',
+                      style: TextStyle(fontSize: 12, color: AppColors.expiringSoon, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Container(
             margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

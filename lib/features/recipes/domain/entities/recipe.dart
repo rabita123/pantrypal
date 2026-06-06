@@ -9,7 +9,8 @@ enum DietaryTag {
   keto('Keto', '🥑'),
   highProtein('High Protein', '💪'),
   nutFree('Nut-Free', '🥜'),
-  halal('Halal', '☪️');
+  halal('Halal', '☪️'),
+  kidFriendly('Kid-Friendly', '👶');
 
   final String label;
   final String emoji;

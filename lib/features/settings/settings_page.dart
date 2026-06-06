@@ -5,15 +5,26 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:pantrypal/core/theme/app_theme.dart';
 import 'package:pantrypal/core/utils/database_helper.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
-import 'package:pantrypal/features/settings/privacy_policy_page.dart';
 import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
 import 'package:pantrypal/features/subscription/presentation/paywall_page.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
-  static const _termsUrl = 'https://rabita123.github.io/pantrypal/terms';
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  static const _privacyUrl = 'https://sites.google.com/view/pantrypal-app/privacy-policy';
+  static const _termsUrl = 'https://sites.google.com/view/pantrypal-app/terms-of-service';
   static const _contactEmail = 'tasmin.saira@gmail.com';
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<SubscriptionCubit>().load();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,10 +52,10 @@ class SettingsPage extends StatelessWidget {
             icon: Icons.privacy_tip_outlined,
             label: 'Privacy Policy',
             isDark: isDark,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
-            ),
+            onTap: () async {
+              final uri = Uri.parse(_privacyUrl);
+              if (await canLaunchUrl(uri)) launchUrl(uri);
+            },
           ),
           _SettingsTile(
             icon: Icons.description_outlined,
@@ -64,7 +75,7 @@ class SettingsPage extends StatelessWidget {
             label: 'Delete All Data',
             isDark: isDark,
             destructive: true,
-            onTap: () => _confirmDeleteData(context, isDark),
+            onTap: () => _confirmDeleteData(isDark),
           ),
           const SizedBox(height: 8),
 
@@ -97,7 +108,7 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmDeleteData(BuildContext context, bool isDark) async {
+  Future<void> _confirmDeleteData(bool isDark) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -137,13 +148,13 @@ class SettingsPage extends StatelessWidget {
       ),
     );
 
-    if (confirmed != true || !context.mounted) return;
+    if (confirmed != true || !mounted) return;
 
     await DatabaseHelper.instance.clearAllData();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('free_scan_count');
 
-    if (!context.mounted) return;
+    if (!mounted) return;
     context.read<PantryBloc>().add(PantryLoad());
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -336,7 +347,6 @@ class _SettingsTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(
         color: isDark ? AppColors.darkCard : AppColors.card,
-        borderRadius: BorderRadius.circular(12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border),

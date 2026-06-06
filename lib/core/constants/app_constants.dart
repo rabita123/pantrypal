@@ -15,6 +15,7 @@ class AppConstants {
   // Default shelf life by category (days)
   static const Map<String, int> defaultShelfLife = {
     'dairy': 7,
+    'eggs': 21,
     'meat': 3,
     'vegetables': 5,
     'fruits': 7,
@@ -55,6 +56,14 @@ class AppConstants {
     // Address / contact
     '.com', 'tel:', 'fax:',
     'customer service',
+    // Invoice / store metadata (South Asian receipts)
+    'bin no', 'bin:', 'invoice no', 'invoice date', 'print date',
+    'pos user', 'pos terminal', 'business hour',
+    'helpline', 'helpline:',
+    'customer name', 'customer mobile', 'customer address',
+    'net payable', 'bank paid', 'cash paid', 'paid amount', 'change amount',
+    'redeem point', 'inword', 'in word',
+    'payment information', 'payment info',
   ];
 
   // Common grocery items for fuzzy matching (freetext fallback)
@@ -70,5 +79,9 @@ class AppConstants {
     'ketchup', 'mustard', 'mayo', 'sauce', 'vinegar', 'honey', 'jam', 'syrup',
     'soup', 'stock', 'broth', 'hummus', 'salsa',
     'canned', 'frozen', 'organic', 'fresh',
+    // South Asian / Bangladeshi items
+    'vermicelli', 'biscuit', 'ghee', 'lentil', 'dal', 'atta', 'maida',
+    'mustard oil', 'hilsa', 'rui', 'pineapple', 'cucumber', 'brinjal',
+    'bitter gourd', 'bottle gourd', 'pointed gourd', 'taro',
   ];
 }

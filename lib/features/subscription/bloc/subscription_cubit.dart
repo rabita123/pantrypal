@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:pantrypal/features/subscription/services/subscription_service.dart';
@@ -73,6 +74,12 @@ class SubscriptionCubit extends Cubit<SubscriptionState> {
       }
       // User-cancelled purchase: silently stay on paywall
     } catch (e) {
+      if (e is PlatformException) {
+        final code = (e.details as Map?)?.entries
+            .firstWhere((entry) => entry.key == 'readableErrorCode', orElse: () => const MapEntry('', ''))
+            .value as String? ?? '';
+        if (e.details?['userCancelled'] == true || code == 'PURCHASE_CANCELLED') return;
+      }
       emit(SubscriptionError(e.toString()));
     }
   }

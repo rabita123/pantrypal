@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pantrypal/core/theme/app_theme.dart';
-import 'package:pantrypal/features/settings/privacy_policy_page.dart';
 import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
 
 class PaywallPage extends StatelessWidget {
@@ -325,8 +324,8 @@ class _PackageOptionsState extends State<_PackageOptions> {
 
 class _LegalFooter extends StatelessWidget {
   final bool isDark;
-  // TODO: replace with your real Terms of Service URL before App Store submission
-  static const _termsUrl = 'https://rabita123.github.io/pantrypal/terms';
+  static const _privacyUrl = 'https://sites.google.com/view/pantrypal-app/privacy-policy';
+  static const _termsUrl = 'https://sites.google.com/view/pantrypal-app/terms-of-service';
 
   const _LegalFooter({required this.isDark});
 
@@ -360,10 +359,10 @@ class _LegalFooter extends StatelessWidget {
                   decorationColor: AppColors.primary,
                 ),
                 recognizer: TapGestureRecognizer()
-                  ..onTap = () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
-                      ),
+                  ..onTap = () async {
+                    final uri = Uri.parse(_privacyUrl);
+                    if (await canLaunchUrl(uri)) launchUrl(uri);
+                  },
               ),
               const TextSpan(text: '  ·  '),
               TextSpan(
