@@ -1,11 +1,14 @@
-# PantryPal — Privacy Policy & Terms and Conditions
+# PantryPal — Legal Documents
+
+**Privacy Policy:** https://sites.google.com/view/pantrypal-app/privacy-policy
+**Terms of Service:** https://sites.google.com/view/pantrypal-app/terms-of-service
 
 ---
 
 ## Privacy Policy
 
 **Effective Date:** May 30, 2026
-**Last Updated:** May 30, 2026
+**Last Updated:** June 6, 2026
 
 ### 1. Overview
 
@@ -16,57 +19,75 @@ PantryPal ("we", "us", or "our") is committed to protecting your privacy. This P
 #### 2.1 Information You Provide
 - Pantry items, food inventory, and expiry dates you manually enter.
 - Receipt images you capture or upload for scanning.
+- Fridge photos you capture when using the AI fridge analysis feature.
 
 #### 2.2 Information Collected Automatically
-- **Camera data:** Receipt images captured in-app are processed locally on your device using on-device OCR (optical character recognition). Images are not uploaded to any external server.
-- **Local notifications:** We use your device's notification system to send you expiry reminders. No notification data is shared externally.
-- **App usage data:** We do not collect analytics, crash reports, or usage telemetry at this time.
+- **Camera data (receipt scan):** When you scan a receipt, the image is sent to our secure Supabase cloud servers for processing via Claude AI. If your device is offline, processing falls back to on-device ML Kit OCR and no image is uploaded.
+- **Camera data (fridge scan & recipe generation):** Fridge photos and pantry data are sent to our secure Supabase cloud servers for processing via Claude AI. See Section 5 for details.
+- **Local notifications:** We use your device's notification system to send expiry reminders. No notification data is shared externally.
+- **Purchase data:** If you subscribe to PantryPal Premium, your subscription is managed by RevenueCat. RevenueCat may collect purchase identifiers and subscription status. See their privacy policy at https://www.revenuecat.com/privacy.
+- **App usage data:** We do not collect analytics, crash reports, or usage telemetry beyond what is described in this policy.
 
 #### 2.3 Information We Do NOT Collect
-- We do not collect your name, email address, or any account credentials.
+- We do not collect your name, email address, or any account credentials for core features.
 - We do not collect location data.
 - We do not collect contacts, microphone input, or health data.
 - We do not use advertising networks or tracking SDKs.
 
 ### 3. How We Use Your Information
 
-All data you enter (pantry items, expiry dates, receipt scans) is stored **locally on your device only**. We use this data solely to:
-- Display your pantry inventory and expiry timeline within the App.
-- Send local push notifications to remind you of items nearing expiry.
+| Data | Where Processed | Purpose |
+|---|---|---|
+| Manually entered pantry data | On-device only | Display inventory, send expiry reminders |
+| Receipt photos (scan feature) | Supabase servers + Claude AI (primary); on-device ML Kit (offline fallback) | Extract food items from receipt |
+| Fridge photos (AI fridge scan) | Supabase servers + Claude AI | Identify food items in your fridge |
+| Pantry contents (AI recipe generation) | Supabase servers + Claude AI | Generate personalised recipe suggestions |
+| Subscription status | RevenueCat servers | Manage Premium access |
 
-### 4. Data Storage and Security
+### 4. AI Features and Data Processing
 
-- All pantry data is stored on-device using local device storage.
-- No data is transmitted to our servers or any third-party servers.
-- If you delete the App, all locally stored data is permanently removed from your device.
+When you use AI-powered features (AI Fridge Scan, Generate Recipe), the relevant data (fridge image or pantry item list) is transmitted over an encrypted HTTPS connection to our Supabase Edge Functions, which use Anthropic Claude AI to generate a response. This data is:
+
+- Used solely to generate your requested result.
+- Not stored on our servers after the response is returned.
+- Not used to train AI models.
+- Not shared with any third party beyond the processing pipeline described above.
+
+You can choose not to use AI features; all core pantry tracking and receipt scanning works entirely on-device.
 
 ### 5. Third-Party Services
 
-The App uses the following on-device frameworks, none of which transmit your data externally:
+| Service | Purpose | Data Sent |
+|---|---|---|
+| Google ML Kit (on-device) | Offline fallback OCR for receipts | Nothing — on-device only |
+| Supabase Edge Functions | Receipt scanning, fridge analysis, recipe generation | Receipt photos, fridge images, pantry lists |
+| Anthropic Claude AI | Receipt OCR, fridge analysis, recipe generation | Receipt photos, fridge images, pantry lists (via Supabase) |
+| RevenueCat | Subscription management | Purchase identifiers |
+| Flutter Local Notifications | Expiry reminder notifications | Nothing — on-device only |
 
-| Service | Purpose |
-|---|---|
-| Google ML Kit (on-device) | OCR text recognition from receipt photos |
-| Flutter Local Notifications | Local expiry reminder notifications |
+### 6. Data Storage and Security
 
-### 6. Children's Privacy
+- All pantry data is stored on-device using encrypted local device storage.
+- Data sent for AI features is transmitted over HTTPS and is not retained on our servers.
+- Subscription data is managed by RevenueCat under their security standards.
+- If you delete the App, all locally stored data is permanently removed from your device.
+
+### 7. Children's Privacy
 
 PantryPal is not directed at children under 13. We do not knowingly collect personal information from children. If you believe a child has provided personal data through the App, please contact us so we can remove it.
 
-### 7. Your Rights
+### 8. Your Rights
 
-Since all data is stored locally on your device, you have full control:
-- **Access:** View all your data directly within the App.
-- **Deletion:** Delete individual items within the App, or uninstall the App to remove all data.
-- **Portability:** There is no account or cloud sync; your data stays on your device.
+- **Access:** View all your pantry data directly within the App.
+- **Deletion:** Delete individual items within the App, or uninstall the App to remove all local data.
+- **AI data:** AI feature data is not retained on our servers; there is nothing to delete after the response is delivered.
+- **Subscription:** Manage or cancel your subscription at any time through your Apple ID account settings.
 
-### 8. Changes to This Policy
+### 9. Changes to This Policy
 
-We may update this Privacy Policy from time to time. We will notify you of significant changes by updating the "Last Updated" date. Continued use of the App after changes constitutes acceptance of the updated policy.
+We may update this Privacy Policy from time to time. We will notify you of significant changes by updating the "Last Updated" date above. Continued use of the App after changes constitutes acceptance of the updated policy.
 
-### 9. Contact Us
-
-If you have questions about this Privacy Policy, please contact:
+### 10. Contact Us
 
 **Email:** tasmin.saira@gmail.com
 
@@ -75,7 +96,7 @@ If you have questions about this Privacy Policy, please contact:
 ## Terms and Conditions
 
 **Effective Date:** May 30, 2026
-**Last Updated:** May 30, 2026
+**Last Updated:** June 6, 2026
 
 ### 1. Acceptance of Terms
 
@@ -90,7 +111,12 @@ We grant you a limited, non-exclusive, non-transferable, revocable license to us
 PantryPal is a personal pantry management tool that helps you:
 - Track food items and their expiry dates.
 - Scan grocery receipts using your device camera to populate your pantry.
-- Receive local notifications when items are nearing expiry.
+- Scan product barcodes to add items.
+- Use AI to identify food items from a fridge photo (Premium).
+- Discover and generate personalised recipes using AI (Premium).
+- Manage a smart shopping list.
+- Plan kids' meals.
+- Receive local push notifications when items are nearing expiry.
 
 The App is provided for personal use only and is not intended for commercial food inventory management.
 
@@ -99,48 +125,79 @@ The App is provided for personal use only and is not intended for commercial foo
 You agree to:
 - Use the App only for lawful purposes.
 - Not attempt to reverse-engineer, decompile, or modify the App.
-- Not use the App in any way that could damage, disable, or impair the App.
+- Not use the App in any way that could damage, disable, or impair the App or our servers.
+- Not attempt to circumvent subscription restrictions or access Premium features without a valid subscription.
 
 ### 5. Accuracy of Information
 
-PantryPal uses on-device OCR to parse receipts. Receipt scanning results may not always be accurate due to variations in receipt formatting, print quality, and OCR limitations. You are responsible for reviewing and correcting any auto-populated pantry data. We make no guarantee of accuracy of scanned results.
+PantryPal uses on-device OCR and AI to parse receipts and analyse fridge contents. Results may not always be accurate due to image quality, receipt formatting, lighting conditions, and the inherent limitations of AI models. You are responsible for reviewing and correcting any auto-populated pantry data. We make no guarantee of accuracy of scanned or AI-generated results.
 
-### 6. Disclaimer of Warranties
+**You should not rely solely on this App to make food safety decisions.** Always use your own judgement when determining whether food is safe to consume.
+
+### 6. Subscription and Payment Terms
+
+#### 6.1 Premium Subscription
+
+PantryPal offers an optional Premium subscription that unlocks additional features including AI-powered fridge scanning, AI recipe generation, and unlimited pantry items. A free tier with core features is available without a subscription.
+
+#### 6.2 Pricing
+
+Subscription prices are displayed in the App before purchase, in your local currency as determined by the Apple App Store. Prices may vary by region and are subject to change. Available plans may include weekly, monthly, and annual billing options.
+
+#### 6.3 Free Trial
+
+Where offered, a free trial period will be clearly indicated before purchase. If you do not cancel before the end of the free trial period, your subscription will automatically convert to a paid subscription at the displayed price.
+
+#### 6.4 Billing and Renewal
+
+- Subscriptions are billed through your Apple ID account via the Apple App Store.
+- Subscriptions automatically renew at the end of each billing period unless cancelled at least 24 hours before the renewal date.
+- Your Apple ID account will be charged for renewal within 24 hours prior to the end of the current period.
+- You can manage and cancel your subscription at any time in your Apple ID Account Settings (Settings → [your name] → Subscriptions).
+
+#### 6.5 Cancellations and Refunds
+
+- You may cancel your subscription at any time. Cancellation takes effect at the end of the current billing period; you retain Premium access until then.
+- We do not offer refunds for partial subscription periods. All purchases are final unless required by applicable law.
+- Refund requests for exceptional circumstances may be submitted to Apple directly, as all payments are processed by the Apple App Store.
+
+#### 6.6 Price Changes
+
+We reserve the right to change subscription pricing at any time. You will be notified of price changes in advance and given the opportunity to cancel before the new price takes effect.
+
+### 7. Disclaimer of Warranties
 
 THE APP IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
 
 We do not warrant that:
 - The App will be uninterrupted or error-free.
 - Expiry date reminders will always be delivered on time (delivery depends on your device's notification settings).
-- Receipt scanning will be 100% accurate.
+- Receipt scanning or AI analysis will be accurate.
+- AI-generated recipes are nutritionally appropriate for all users.
 
-**You should not rely solely on this App to make food safety decisions.** Always use your own judgement when determining whether food is safe to consume.
-
-### 7. Limitation of Liability
+### 8. Limitation of Liability
 
 TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, WE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING OUT OF OR RELATED TO YOUR USE OF THE APP, INCLUDING BUT NOT LIMITED TO LOSS OF DATA, FOODBORNE ILLNESS, OR FOOD WASTE, EVEN IF WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 
-Our total liability to you for any claims arising from these Terms or the App shall not exceed the amount you paid for the App (if any).
+Our total liability to you for any claims arising from these Terms or the App shall not exceed the total amount you paid for the App or a Premium subscription in the twelve (12) months preceding the claim.
 
-### 8. Intellectual Property
+### 9. Intellectual Property
 
 All content, design, code, and branding within PantryPal are owned by us or our licensors and are protected by applicable intellectual property laws. You may not reproduce, distribute, or create derivative works without our express written permission.
 
-### 9. Termination
+### 10. Termination
 
-We reserve the right to discontinue the App at any time without notice. You may stop using the App at any time by deleting it from your device.
+We reserve the right to discontinue the App at any time without notice. You may stop using the App at any time by deleting it from your device. Upon termination, your license to use the App immediately ceases. Active subscriptions will continue until the end of the paid period.
 
-### 10. Governing Law
+### 11. Governing Law
 
 These Terms are governed by and construed in accordance with the laws of your country of residence, without regard to conflict of law principles. Any disputes shall be resolved in the courts of competent jurisdiction in your location.
 
-### 11. Changes to Terms
+### 12. Changes to Terms
 
 We may update these Terms from time to time. We will notify you of significant changes by updating the "Last Updated" date above. Continued use of the App after changes constitutes acceptance of the updated Terms.
 
-### 12. Contact Us
-
-For questions about these Terms, please contact:
+### 13. Contact Us
 
 **Email:** tasmin.saira@gmail.com
 
