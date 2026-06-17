@@ -1,6 +1,7 @@
 platform :ios, '13.0'
 
-# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+workspace 'Runner'
+
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -40,7 +41,21 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
-      # arm64 excluded only for pods that don't support it; Runner itself builds arm64
     end
+  end
+  installer.aggregate_targets.each do |aggregate_target|
+    aggregate_target.user_project.native_targets.each do |native_target|
+      next unless native_target.name == 'Runner'
+      native_target.build_phases.each do |phase|
+        next unless phase.respond_to?(:name)
+        if phase.name == 'Thin Binary'
+          phase.input_paths = []
+          phase.output_paths = []
+          phase.input_file_list_paths = []
+          phase.output_file_list_paths = []
+        end
+      end
+    end
+    aggregate_target.user_project.save
   end
 end

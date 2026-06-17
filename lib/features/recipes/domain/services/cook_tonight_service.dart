@@ -21,7 +21,7 @@ class CookTonightResult {
   final int expiringCount;
 
   double get matchPercent => totalCount == 0 ? 0 : foundCount / totalCount;
-  bool get canCookNow => matchPercent >= 0.8;
+  bool get canCookNow => totalCount > 0 && foundCount == totalCount;
 
   const CookTonightResult({
     required this.recipe,
@@ -69,25 +69,30 @@ class CookTonightService {
     );
   }
 
-  // Bidirectional word overlap — "chicken breast" matches "chicken", "tomatoes" matches "tomato"
+  // Token match: "chicken breast" matches "chicken", "tomatoes" matches "tomato"
   static bool _isMatch(String ingredient, String pantryName) {
     final a = _tokens(ingredient);
     final b = _tokens(pantryName);
-    // Check if any meaningful token from either side appears in the other
-    for (final token in a) {
-      if (b.any((t) => t.contains(token) || token.contains(t))) return true;
-    }
-    return false;
+    if (a.isEmpty || b.isEmpty) return false;
+    return a.any((t) => b.contains(t));
   }
 
   static List<String> _tokens(String name) {
-    const stop = {'a', 'an', 'the', 'of', 'or', 'and', 'with', 'in', 'to', 'for', 'fresh', 'large', 'small', 'medium'};
+    // Stop words filtered AFTER stemming so plural/stemmed forms are also caught.
+    // Generic descriptor words (sauce, powder, paste…) are stripped so that
+    // "soy sauce" and "tomato sauce" don't falsely match via the word "sauce".
+    const stop = {
+      'a', 'an', 'the', 'of', 'or', 'and', 'with', 'in', 'to', 'for',
+      'fresh', 'large', 'small', 'medium',
+      'sauce', 'powder', 'paste', 'stock', 'juice', 'seed', 'flake', 'leaf',
+    };
     return name
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z\s]'), '')
         .split(RegExp(r'\s+'))
-        .where((w) => w.length >= 3 && !stop.contains(w))
+        .where((w) => w.length >= 3)
         .map((w) => w.endsWith('s') && w.length > 4 ? w.substring(0, w.length - 1) : w)
+        .where((w) => !stop.contains(w))
         .toList();
   }
 

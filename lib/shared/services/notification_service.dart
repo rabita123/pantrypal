@@ -16,8 +16,8 @@ class NotificationService {
   final _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
-  /// Set this to handle a notification tap — switches the app to the Recipes tab.
-  static VoidCallback? onNotificationTap;
+  /// Set this to handle a notification tap — opens Cook Tonight page for the expiring item.
+  static void Function(String? itemName)? onNotificationTap;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -37,7 +37,7 @@ class NotificationService {
     );
     await _plugin.initialize(
       const InitializationSettings(android: android, iOS: darwin, macOS: darwin),
-      onDidReceiveNotificationResponse: (_) => onNotificationTap?.call(),
+      onDidReceiveNotificationResponse: (r) => onNotificationTap?.call(r.payload),
       onDidReceiveBackgroundNotificationResponse: _onBackgroundTap,
     );
     await _plugin
@@ -100,7 +100,7 @@ class NotificationService {
       await _plugin.zonedSchedule(
         baseId,
         '${item.category.emoji} ${item.name} expires in 2 days',
-        'Plan to use it soon before it goes to waste.',
+        'Tap to find recipes using it before it expires.',
         twoDayAt9,
         const NotificationDetails(
           android: AndroidNotificationDetails(
@@ -114,6 +114,7 @@ class NotificationService {
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
+        payload: item.name,
       );
     }
 
@@ -138,6 +139,7 @@ class NotificationService {
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
+        payload: item.name,
       );
     }
   }

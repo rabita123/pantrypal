@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pantrypal/features/pantry/data/repositories/pantry_repository.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
+import 'package:pantrypal/shared/services/widget_service.dart';
 
 // ── Events ────────────────────────────────────────────────────────────────────
 
@@ -148,6 +149,10 @@ class PantryBloc extends Bloc<PantryEvent, PantryState> {
         expiringItems: expiring,
         stats: stats,
       ));
+      WidgetService.updateWidget(
+        expiringItems: expiring,
+        totalItems: items.length,
+      ).ignore();
     } catch (e) {
       emit(PantryError(e.toString()));
     }

@@ -7,7 +7,8 @@ import 'package:pantrypal/core/theme/app_theme.dart';
 import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
 
 class PaywallPage extends StatelessWidget {
-  const PaywallPage({super.key});
+  final bool isLimitReached;
+  const PaywallPage({super.key, this.isLimitReached = false});
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +65,9 @@ class PaywallPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        "You've used your 3 free scans.\nUpgrade for unlimited receipt scanning.",
+                        isLimitReached
+                            ? "You've used all 3 free scans.\nUpgrade for unlimited scanning."
+                            : "Unlock unlimited scanning, expiry alerts,\nand everything PantryPal has to offer.",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 15,

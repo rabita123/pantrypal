@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class SubscriptionService {
   static const _scanCountKey = 'free_scan_count';
-  static const _freeScansAllowed = 1;
+  static const _freeScansAllowed = 3;
 
   static final instance = SubscriptionService._();
   SubscriptionService._();
