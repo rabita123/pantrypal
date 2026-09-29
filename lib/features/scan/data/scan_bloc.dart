@@ -104,7 +104,8 @@ class ScanBloc extends Bloc<ScanEvent, ScanState> {
       } else {
         selected.add(event.index);
       }
-      emit(ScanReviewReady(current.parsedItems, selected));
+      emit(ScanReviewReady(current.parsedItems, selected,
+          isOfflineFallback: current.isOfflineFallback));
     }
   }
 
@@ -113,7 +114,8 @@ class ScanBloc extends Bloc<ScanEvent, ScanState> {
     if (current is ScanReviewReady) {
       final items = List<Map<String, dynamic>>.from(current.parsedItems);
       items[event.index] = {...items[event.index], ...event.data};
-      emit(ScanReviewReady(items, current.selectedIndices));
+      emit(ScanReviewReady(items, current.selectedIndices,
+          isOfflineFallback: current.isOfflineFallback));
     }
   }
 
@@ -126,10 +128,11 @@ class ScanBloc extends Bloc<ScanEvent, ScanState> {
         id: _uuid.v4(),
         name: m['name'] as String,
         category: m['category'] as FoodCategory,
-        location: StorageLocation.fridge,
+        // File it where that food actually lives (rice → pantry, milk → fridge).
+        location: (m['category'] as FoodCategory).defaultLocation,
         quantity: (m['quantity'] as double?) ?? 1.0,
         unit: (m['unit'] as String?) ?? 'item',
-        expiryDate: now.add(Duration(days: days)),
+        expiryDate: PantryItem.expiryInDays(days, from: now),
         addedDate: now,
         price: m['price'] as double?,
         isConsumed: false,

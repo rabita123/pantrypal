@@ -494,7 +494,7 @@ class _ReviewView extends StatelessWidget {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Tap to select/deselect · Tap ✏️ to edit name & expiry date',
+                    'Everything is selected. Tap an item to skip it, or ✏️ to fix it.',
                     style: TextStyle(fontSize: 12, color: AppColors.primary, height: 1.4),
                   ),
                 ),
@@ -582,7 +582,7 @@ class _ReviewView extends StatelessWidget {
                 flex: 2,
                 child: ElevatedButton(
                   onPressed: selected == 0 ? null : () => _confirmAdd(context),
-                  child: Text('Add $selected item${selected == 1 ? '' : 's'} to pantry'),
+                  child: Text('Add $selected item${selected == 1 ? '' : 's'}'),
                 ),
               ),
             ],
@@ -596,14 +596,8 @@ class _ReviewView extends StatelessWidget {
     final scanBloc = context.read<ScanBloc>();
     final items = scanBloc.buildPantryItems(state);
     context.read<PantryBloc>().add(PantryAddItems(items));
-    Navigator.pop(context, true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${items.length} item${items.length == 1 ? '' : 's'} added to pantry! 🎉'),
-        backgroundColor: AppColors.primary,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    // The caller shows what it all means (use-first, at-risk, cook tonight).
+    Navigator.pop(context, items);
   }
 
   void _editItem(BuildContext context, int index, Map<String, dynamic> item) {

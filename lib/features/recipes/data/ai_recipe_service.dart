@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:pantrypal/core/config/backend_config.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 
 class AIRecipe {
@@ -46,11 +47,20 @@ class AIRecipe {
   }
 }
 
-class AIRecipeService {
-  static const _supabaseUrl = 'https://hwkaxobdmyiyodtgrpio.supabase.co';
-  static const _supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3a2F4b2JkbXlpeW9kdGdycGlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMjEyNjcsImV4cCI6MjA5NTc5NzI2N30.naKIQOSgMjP_-yM5fiNpiwpkSB2SuNHha9uVSTJF4Ug';
+/// Prefers the server's own error text, falling back to plain language.
+String _serverMessage(http.Response response) {
+  try {
+    final body = jsonDecode(response.body);
+    final error = (body is Map ? body['error'] : null) as String?;
+    if (error != null && error.isNotEmpty) return error;
+  } catch (_) {
+    // Non-JSON body (a gateway HTML page, say) — fall through.
+  }
+  return 'The recipe service is unavailable right now (${response.statusCode}). '
+      'Please try again shortly.';
+}
 
+class AIRecipeService {
   static Future<AIRecipe> generate(List<PantryItem> pantryItems) async {
     // Send items expiring within 7 days first, then the rest
     final sorted = [...pantryItems]
@@ -62,26 +72,31 @@ class AIRecipeService {
       'daysLeft': item.daysUntilExpiry.clamp(0, 999),
     }).toList();
 
-    final response = await http.post(
-      Uri.parse('$_supabaseUrl/functions/v1/generate-recipe'),
-      headers: {
-        'Authorization': 'Bearer $_supabaseAnonKey',
-        'apikey': _supabaseAnonKey,
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({'items': items}),
-    ).timeout(const Duration(seconds: 40));
+    final http.Response response;
+    try {
+      response = await http
+          .post(
+            BackendConfig.function('generate-recipe'),
+            headers: BackendConfig.headers,
+            body: jsonEncode({'items': items}),
+          )
+          .timeout(const Duration(seconds: 40));
+    } catch (e) {
+      throw BackendException.from(e);
+    }
 
     if (response.statusCode != 200) {
-      final body = jsonDecode(response.body);
-      throw Exception(body['error'] ?? 'Server error ${response.statusCode}');
+      throw BackendException(_serverMessage(response));
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final rawText = data['result'] as String? ?? '';
 
     final match = RegExp(r'\{[\s\S]*\}').firstMatch(rawText);
-    if (match == null) throw Exception('Could not parse recipe from AI response');
+    if (match == null) {
+      throw const BackendException(
+          "The kitchen came back with something we couldn't read. Try again.");
+    }
 
     final json = jsonDecode(match.group(0)!) as Map<String, dynamic>;
     return AIRecipe.fromJson(json);

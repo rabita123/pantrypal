@@ -171,23 +171,44 @@ class GroceryOcrParser {
     if (sameLineItems.isNotEmpty) return sameLineItems.take(30).toList();
 
     // ── Strategy 2: adjacent-line (OCR puts price on very next line) ────────
-    final adjacentItems = <Map<String, dynamic>>[];
-    for (int i = 0; i < lines.length - 1; i++) {
-      final line = lines[i];
-      if (_shouldSkipLine(line.toLowerCase())) continue;
-      if (negativePattern.hasMatch(line)) continue;
-      if (priceAtEnd.hasMatch(line)) continue; // already tried
-      final nextLine = lines[i + 1].trim();
-      final nm = standalonePrice.firstMatch(nextLine);
-      if (nm == null) continue;
-      final price = double.tryParse(nm.group(1)!.replaceAll(',', '.')) ?? 0.0;
-      final item = buildItem(line.trim(), price);
-      if (item != null) {
-        adjacentItems.add(item);
-        i++; // consume price line
+    // Skipped for a two-column layout, where OCR emits every name and only
+    // then every price. There the "next line" after the last name is the
+    // FIRST price, so pairing them keeps one item and gives it the wrong
+    // amount. Strategy 3 below reads that shape correctly.
+    bool looksLikeColumnSplit() {
+      // Count the longest run of consecutive price-only lines. A genuine
+      // alternating name/price receipt never stacks three prices in a row.
+      int longestRun = 0, run = 0;
+      for (final line in lines) {
+        if (standalonePrice.hasMatch(line)) {
+          run++;
+          if (run > longestRun) longestRun = run;
+        } else {
+          run = 0;
+        }
       }
+      return longestRun >= 3;
     }
-    if (adjacentItems.isNotEmpty) return adjacentItems.take(30).toList();
+
+    if (!looksLikeColumnSplit()) {
+      final adjacentItems = <Map<String, dynamic>>[];
+      for (int i = 0; i < lines.length - 1; i++) {
+        final line = lines[i];
+        if (_shouldSkipLine(line.toLowerCase())) continue;
+        if (negativePattern.hasMatch(line)) continue;
+        if (priceAtEnd.hasMatch(line)) continue; // already tried
+        final nextLine = lines[i + 1].trim();
+        final nm = standalonePrice.firstMatch(nextLine);
+        if (nm == null) continue;
+        final price = double.tryParse(nm.group(1)!.replaceAll(',', '.')) ?? 0.0;
+        final item = buildItem(line.trim(), price);
+        if (item != null) {
+          adjacentItems.add(item);
+          i++; // consume price line
+        }
+      }
+      if (adjacentItems.isNotEmpty) return adjacentItems.take(30).toList();
+    }
 
     // ── Strategy 3: column split (all names first, then all prices) ─────────
     // OCR often reads a two-column receipt as: all item names, then all prices.
@@ -195,14 +216,22 @@ class GroceryOcrParser {
     final nameBlock = <String>[];
     final priceBlock = <double>[];
     for (final line in lines) {
-      if (_shouldSkipLine(line.toLowerCase())) continue;
+      // Items always precede the summary block on a receipt, so stop here.
+      // Without this the total's amount enters the price column and gets
+      // paired with an item — a single scanned item would otherwise be
+      // priced at the whole basket total.
+      if (_isTotalsLabel(line.toLowerCase())) break;
       if (negativePattern.hasMatch(line)) continue;
+      // Price lines are matched BEFORE _shouldSkipLine, which discards any
+      // bare number as a barcode — that filter would otherwise swallow every
+      // price in the column and leave nothing to pair the names with.
       final sm = standalonePrice.firstMatch(line);
       if (sm != null) {
         final p = double.tryParse(sm.group(1)!.replaceAll(',', '.')) ?? 0.0;
-        // Exclude totals (usually > $100 for full shop or suspiciously large)
+        // Bounds also exclude barcodes and phone numbers read as one number.
         if (p >= 0.10 && p < 100000.0) priceBlock.add(p);
       } else {
+        if (_shouldSkipLine(line.toLowerCase())) continue;
         // Strict candidate filter: must look like an actual food item
         if (line.length < 3 || line.length > 60) continue;
         if (line.contains('#')) continue;
@@ -300,15 +329,42 @@ class GroceryOcrParser {
     return AppConstants.skipKeywords.any((k) => lower.contains(k));
   }
 
+  // Currency codes that appear on receipts, matched explicitly.
+  // Matching any 2-4 letter capitalised word instead would delete the food
+  // itself on ALL-CAPS receipts — "WHOLE MILK" would become "WHOLE".
+  static const _currencyCodes =
+      'CHF|EUR|USD|GBP|CAD|AUD|NZD|JPY|CNY|INR|BDT|PKR|LKR|NPR|AED|SAR|QAR|'
+      'KWD|BHD|OMR|TRY|RUB|UAH|PLN|CZK|HUF|RON|BGN|SEK|NOK|DKK|ISK|ZAR|NGN|'
+      'KES|GHS|EGP|MAD|BRL|ARS|CLP|COP|MXN|PEN|SGD|MYR|THB|IDR|PHP|VND|KRW|'
+      'HKD|TWD|ILS|TK|RS|KR';
+
+  // Labels that open a receipt's summary block. Everything after one of
+  // these is totals, tax and payment — never an item.
+  static bool _isTotalsLabel(String lower) {
+    return lower.contains('total') ||
+        lower.contains('net payable') ||
+        lower.contains('amount due') ||
+        lower.contains('amount paid') ||
+        lower.contains('balance due') ||
+        lower.contains('inword') ||
+        lower.contains('in word');
+  }
+
   static String _cleanName(String name) {
     name = name.replaceAll(RegExp(r'[*#@!]'), '');
     // Strip unit-price segments like "à 4.50 CHF" or "@ 22.00 EUR"
     name = name.replaceAll(
-        RegExp(r'\s*[àa@]\s*\d+[.,]\d+\s*[A-Z]{2,4}', caseSensitive: false), '');
+        RegExp('\\s*[àa@]\\s*\\d+[.,]\\d+\\s*(?:$_currencyCodes)\\b',
+            caseSensitive: false),
+        '');
     // Strip trailing currency+amount
     name = name.replaceAll(
-        RegExp(r'\s*\d+[.,]\d+\s*[A-Z]{2,4}', caseSensitive: false), '');
-    name = name.replaceAll(RegExp(r'\s*[A-Z]{2,4}\s*$'), '');
+        RegExp('\\s*\\d+[.,]\\d+\\s*(?:$_currencyCodes)\\b',
+            caseSensitive: false),
+        '');
+    // Strip a bare trailing currency code — but never an ordinary word.
+    name = name.replaceAll(
+        RegExp('\\s*(?:$_currencyCodes)\\s*\$'), '');
     name = name.replaceAll(RegExp(r'\s{2,}'), ' ');
     name = name.replaceAll(RegExp(r'^\d+\s+'), ''); // leading stand-alone number
     return name.trim();
@@ -329,6 +385,10 @@ class GroceryOcrParser {
   );
 
   static bool _isNonFood(String name) => _nonFoodRegex.hasMatch(name);
+
+  /// Best-guess category for a free-typed food name ("Greek Yogurt" → dairy).
+  static FoodCategory guessCategory(String name) =>
+      _guessCategory(name.toLowerCase().trim());
 
   // Single-word names that are just a food category label are almost always
   // OCR split artefacts — e.g. "Cottage Cheese 1.64" scanned as two lines

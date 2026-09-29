@@ -15,7 +15,12 @@ class DatabaseHelper {
 
   Future<Database> _initDatabase() async {
     final path = join(await getDatabasesPath(), AppConstants.dbName);
-    return openDatabase(path, version: AppConstants.dbVersion, onCreate: _onCreate);
+    return openDatabase(
+      path,
+      version: AppConstants.dbVersion,
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
+    );
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -34,7 +39,8 @@ class DatabaseHelper {
         image_url TEXT,
         notes TEXT,
         is_consumed INTEGER NOT NULL DEFAULT 0,
-        is_wasted INTEGER NOT NULL DEFAULT 0
+        is_wasted INTEGER NOT NULL DEFAULT 0,
+        resolved_at INTEGER
       )
     ''');
 
@@ -57,6 +63,15 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX idx_category ON ${AppConstants.itemsTable}(category)',
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // When an item was used or binned — makes "this month" stats real.
+      await db.execute(
+        'ALTER TABLE ${AppConstants.itemsTable} ADD COLUMN resolved_at INTEGER',
+      );
+    }
   }
 
   // ── PANTRY ITEMS ──────────────────────────────────────────────────────────
@@ -132,7 +147,7 @@ class DatabaseHelper {
     final db = await database;
     await db.update(
       AppConstants.itemsTable,
-      {'is_consumed': 1},
+      {'is_consumed': 1, 'resolved_at': DateTime.now().millisecondsSinceEpoch},
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -142,7 +157,7 @@ class DatabaseHelper {
     final db = await database;
     await db.update(
       AppConstants.itemsTable,
-      {'is_wasted': 1},
+      {'is_wasted': 1, 'resolved_at': DateTime.now().millisecondsSinceEpoch},
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -197,6 +212,28 @@ class DatabaseHelper {
         )).first.values.first;
     final wastedValue = ((wastedValueRaw as num?) ?? 0).toDouble();
 
+    // This month's outcomes. Value uses the real price when there is one,
+    // otherwise the category estimate, so every item counts.
+    final monthStart = DateTime(DateTime.now().year, DateTime.now().month)
+        .millisecondsSinceEpoch;
+    final resolved = await db.query(
+      AppConstants.itemsTable,
+      where: '(is_consumed = 1 OR is_wasted = 1) AND resolved_at >= ?',
+      whereArgs: [monthStart],
+    );
+    var consumedMonth = 0, wastedMonth = 0;
+    var savedValueMonth = 0.0, wastedValueMonth = 0.0;
+    for (final row in resolved) {
+      final item = _mapToItem(row);
+      if (item.isConsumed) {
+        consumedMonth++;
+        savedValueMonth += item.estimatedValue;
+      } else {
+        wastedMonth++;
+        wastedValueMonth += item.estimatedValue;
+      }
+    }
+
     return {
       'total': total,
       'expiringSoon': expiringSoon,
@@ -204,7 +241,27 @@ class DatabaseHelper {
       'wasted': wasted,
       'consumed': consumed,
       'wastedValue': wastedValue,
+      'consumedMonth': consumedMonth,
+      'wastedMonth': wastedMonth,
+      'savedValueMonth': savedValueMonth,
+      'wastedValueMonth': wastedValueMonth,
     };
+  }
+
+  /// Foods used up recently (newest first) — the honest source for "you might
+  /// be out of…" suggestions.
+  Future<List<PantryItem>> getRecentlyConsumed({int withinDays = 30}) async {
+    final db = await database;
+    final cutoff = DateTime.now()
+        .subtract(Duration(days: withinDays))
+        .millisecondsSinceEpoch;
+    final maps = await db.query(
+      AppConstants.itemsTable,
+      where: 'is_consumed = 1 AND resolved_at >= ?',
+      whereArgs: [cutoff],
+      orderBy: 'resolved_at DESC',
+    );
+    return maps.map(_mapToItem).toList();
   }
 
   // ── SHOPPING ITEMS ────────────────────────────────────────────────────────

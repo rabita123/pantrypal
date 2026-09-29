@@ -5,9 +5,10 @@ import 'package:pantrypal/core/utils/database_helper.dart';
 import 'package:pantrypal/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:pantrypal/features/onboarding/onboarding_page.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
+import 'package:pantrypal/features/pantry/presentation/bloc/shopping_cubit.dart';
 import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
 import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
-import 'package:pantrypal/features/subscription/presentation/paywall_page.dart';
+import 'package:pantrypal/features/subscription/presentation/paywall_gate.dart';
 import 'package:pantrypal/features/subscription/services/subscription_service.dart';
 import 'package:pantrypal/injection_container.dart';
 import 'package:pantrypal/shared/services/notification_service.dart';
@@ -21,8 +22,9 @@ class PantryPalApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider<PantryBloc>(create: (_) => sl<PantryBloc>()),
+        BlocProvider<ShoppingCubit>(create: (_) => sl<ShoppingCubit>()),
         BlocProvider<RecipeBloc>(create: (_) => sl<RecipeBloc>()),
-        // Provided here so PaywallPage (pushed modally from _RootPage) can read it
+        // Provided here so the paywall (pushed modally from anywhere) can read it
         BlocProvider<SubscriptionCubit>(create: (_) => sl<SubscriptionCubit>()..load()),
       ],
       child: MaterialApp(
@@ -30,7 +32,7 @@ class PantryPalApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
-        themeMode: ThemeMode.system,
+        themeMode: ThemeMode.light,
         home: const _RootPage(),
       ),
     );
@@ -58,9 +60,11 @@ class _RootPageState extends State<_RootPage> {
     final done = prefs.getBool('onboarding_done') ?? false;
     if (!mounted) return;
     setState(() => _onboardingDone = done);
+    final launches = await sl<SubscriptionService>().recordLaunch();
     if (done) {
-      _maybeShowPaywall();
+      await NotificationService.instance.migrateLegacyReminders();
       _maybeShowWeeklyReport(prefs);
+      if (launches >= 2) _maybeOfferPremium();
     }
   }
 
@@ -94,25 +98,15 @@ class _RootPageState extends State<_RootPage> {
     await prefs.setString('weekly_report_last_shown', todayKey);
   }
 
-  Future<void> _maybeShowPaywall() async {
+  /// One gentle offer, on a later visit, only to someone who has already put
+  /// food in the app. Never on first launch and never on every launch.
+  Future<void> _maybeOfferPremium() async {
     final service = sl<SubscriptionService>();
-
-    // Premium users never see the paywall
-    if (await service.isPremium()) return;
-
+    if (!await service.shouldShowSoftPaywall()) return;
+    await service.markSoftPaywallShown();
     if (!mounted) return;
-    final cubit = context.read<SubscriptionCubit>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          fullscreenDialog: true,
-          builder: (_) => BlocProvider.value(
-            value: cubit,
-            child: const PaywallPage(),
-          ),
-        ),
-      );
+      if (mounted) PaywallGate.show(context);
     });
   }
 
@@ -122,11 +116,9 @@ class _RootPageState extends State<_RootPage> {
       return const Scaffold(body: SizedBox.shrink());
     }
     if (!_onboardingDone!) {
+      // No paywall here: the first session is for getting value, not a sale.
       return OnboardingPage(
-        onDone: () {
-          setState(() => _onboardingDone = true);
-          _maybeShowPaywall();
-        },
+        onDone: () => setState(() => _onboardingDone = true),
       );
     }
     return const DashboardPage();

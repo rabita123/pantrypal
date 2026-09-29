@@ -154,36 +154,45 @@ class _RecipesPageState extends State<RecipesPage> {
   }
 
   Widget _buildEmpty(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: AppColors.primarySurface,
-                borderRadius: BorderRadius.circular(24),
+    // Scrollable and shrink-wrapped: with the search field focused the
+    // keyboard takes the lower third of the screen, and a fixed-height
+    // centred column overflows the remaining space.
+    return SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: MediaQuery.sizeOf(context).height * 0.5,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+                Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySurface,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const Icon(Icons.menu_book_outlined, size: 48, color: AppColors.primary),
+                ),
+                const SizedBox(height: 20),
+                const Text('No recipes yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                const Text(
+                  'Add your favourite recipes — including authentic Bangladeshi dishes no other app has!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: AppColors.inkMuted, height: 1.5),
+                ),
+                const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _openAdd,
+                icon: const Icon(Icons.add),
+                label: const Text('Add first recipe'),
               ),
-              child: const Icon(Icons.menu_book_outlined, size: 48, color: AppColors.primary),
-            ),
-            const SizedBox(height: 20),
-            const Text('No recipes yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            const Text(
-              'Add your favourite recipes — including authentic Bangladeshi dishes no other app has!',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: AppColors.inkMuted, height: 1.5),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _openAdd,
-              icon: const Icon(Icons.add),
-              label: const Text('Add first recipe'),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

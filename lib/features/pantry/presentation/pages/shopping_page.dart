@@ -3,13 +3,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:pantrypal/core/theme/app_theme.dart';
 import 'package:pantrypal/core/utils/food_emoji.dart';
+import 'package:pantrypal/core/utils/grocery_ocr_parser.dart';
+import 'package:pantrypal/core/utils/quick_add.dart';
 import 'package:pantrypal/features/pantry/data/repositories/pantry_repository.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
+import 'package:pantrypal/features/pantry/domain/services/pantry_insights.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
+import 'package:pantrypal/features/pantry/presentation/bloc/shopping_cubit.dart';
+import 'package:pantrypal/features/recipes/domain/entities/recipe.dart';
+import 'package:pantrypal/features/recipes/domain/services/cook_tonight_service.dart';
+import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
 import 'package:pantrypal/injection_container.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
+/// A shopping list built around what is actually missing: it warns before you
+/// buy something you already own, suggests what you ran out of and what
+/// tonight's recipe lacks, and files what you bought straight into the pantry.
 class ShoppingPage extends StatefulWidget {
   const ShoppingPage({super.key});
   @override
@@ -19,11 +29,7 @@ class ShoppingPage extends StatefulWidget {
 class _ShoppingPageState extends State<ShoppingPage> {
   static const _uuid = Uuid();
   final _nameCtrl = TextEditingController();
-  final _qtyCtrl = TextEditingController(text: '1');
-  String _unit = 'pcs';
-  List<PantryItem> _restock = [];
-
-  static const _units = ['pcs', 'kg', 'g', 'L', 'mL', 'pack', 'box', 'bag', 'bottle', 'can'];
+  List<String> _usedUp = [];
 
   static const _suggestions = [
     'Apples', 'Avocado', 'Bacon', 'Bananas', 'Beans', 'Beef', 'Bread',
@@ -40,76 +46,97 @@ class _ShoppingPageState extends State<ShoppingPage> {
   @override
   void initState() {
     super.initState();
-    context.read<PantryBloc>().add(ShoppingLoad());
-    _loadRestock();
+    context.read<ShoppingCubit>().load();
+    _loadUsedUp();
     _nameCtrl.addListener(() => setState(() {}));
   }
 
-  Future<void> _loadRestock() async {
-    final items = await sl<PantryRepository>().getAllItems();
+  /// Foods finished in the last month that are not in the pantry any more.
+  Future<void> _loadUsedUp() async {
+    final repo = sl<PantryRepository>();
+    final consumed = await repo.getRecentlyConsumed(days: 30);
+    final active = await repo.getAllItems();
     final seen = <String>{};
-    final candidates = <PantryItem>[];
-    for (final i in items) {
-      if (i.expiryStatus == ExpiryStatus.expired ||
-          i.expiryStatus == ExpiryStatus.expiringSoon ||
-          i.quantity <= 1) {
-        final key = i.name.toLowerCase().trim();
-        if (seen.add(key)) candidates.add(i);
-      }
+    final names = <String>[];
+    for (final c in consumed) {
+      final key = c.name.toLowerCase().trim();
+      if (!seen.add(key)) continue;
+      if (active.any((a) => CookTonightService.namesMatch(a.name, c.name))) continue;
+      names.add(c.name);
     }
-    if (mounted) setState(() => _restock = candidates);
+    if (mounted) setState(() => _usedUp = names.take(8).toList());
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _qtyCtrl.dispose();
     super.dispose();
   }
 
-  void _addItem({String? overrideName}) {
-    final name = (overrideName ?? _nameCtrl.text).trim();
+  /// Returns the pantry item the user already has under this name, if any.
+  Future<PantryItem?> _alreadyHave(String name) async {
+    final active = await sl<PantryRepository>().getAllItems();
+    for (final i in active) {
+      if (i.expiryStatus == ExpiryStatus.expired) continue;
+      if (CookTonightService.namesMatch(i.name, name)) return i;
+    }
+    return null;
+  }
+
+  Future<void> _addItem({String? overrideName}) async {
+    final parsed = QuickAdd.parseLine((overrideName ?? _nameCtrl.text).trim());
+    final name = parsed.name;
     if (name.isEmpty) return;
-    final qty = double.tryParse(_qtyCtrl.text.trim()) ?? 1.0;
-    context.read<PantryBloc>().add(ShoppingAddItem(ShoppingItem(
+
+    final have = await _alreadyHave(name);
+    if (have != null) {
+      if (!mounted) return;
+      final add = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('You already have ${have.name}'),
+          content: Text(
+            '${have.location.emoji} ${have.location.label} · ${have.expiryLabel.toLowerCase()}.\n\n'
+            'Buy more anyway?',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Skip it')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Add anyway')),
+          ],
+        ),
+      );
+      if (add != true) {
+        _nameCtrl.clear();
+        return;
+      }
+    }
+    if (!mounted) return;
+    context.read<ShoppingCubit>().add(ShoppingItem(
       id: _uuid.v4(),
       name: name,
-      category: _inferCategory(name),
-      quantity: qty,
-      unit: _unit,
+      category: GroceryOcrParser.guessCategory(name),
+      quantity: parsed.quantity,
+      unit: 'pcs',
       isChecked: false,
       addedDate: DateTime.now(),
-    )));
+    ));
     _nameCtrl.clear();
-    _qtyCtrl.text = '1';
     setState(() {});
   }
 
-  void _addFromPantry(PantryItem item) {
-    context.read<PantryBloc>().add(ShoppingAddItem(ShoppingItem(
-      id: _uuid.v4(),
-      name: item.name,
-      category: item.category,
-      quantity: 1,
-      unit: item.unit,
-      isChecked: false,
-      addedDate: DateTime.now(),
-    )));
-    setState(() => _restock.remove(item));
-  }
-
-  FoodCategory _inferCategory(String name) {
-    final n = name.toLowerCase();
-    if (['milk', 'cheese', 'butter', 'yogurt', 'cream'].any(n.contains)) return FoodCategory.dairy;
-    if (['egg'].any(n.contains)) return FoodCategory.eggs;
-    if (['chicken', 'beef', 'pork', 'lamb', 'turkey', 'bacon', 'sausage', 'ham', 'fish', 'salmon', 'tuna', 'shrimp'].any(n.contains)) return FoodCategory.meat;
-    if (['apple', 'banana', 'orange', 'grape', 'lemon', 'avocado', 'mango', 'berry'].any(n.contains)) return FoodCategory.fruits;
-    if (['broccoli', 'carrot', 'lettuce', 'spinach', 'onion', 'garlic', 'potato', 'tomato', 'pepper', 'zucchini', 'mushroom'].any(n.contains)) return FoodCategory.vegetables;
-    if (['bread', 'rice', 'pasta', 'flour', 'oat', 'cereal'].any(n.contains)) return FoodCategory.grains;
-    if (['juice', 'water', 'coffee', 'tea', 'soda'].any(n.contains)) return FoodCategory.beverages;
-    if (['chip', 'cookie', 'snack', 'ice cream', 'chocolate', 'candy'].any(n.contains)) return FoodCategory.snacks;
-    if (['ketchup', 'mustard', 'honey', 'oil', 'vinegar', 'salt', 'sugar', 'sauce', 'mayonnaise'].any(n.contains)) return FoodCategory.condiments;
-    return FoodCategory.other;
+  Future<void> _moveBoughtToPantry(List<ShoppingItem> bought) async {
+    final items = bought
+        .map((b) => QuickAdd.itemFor(b.name, category: b.category, quantity: b.quantity))
+        .toList();
+    context.read<PantryBloc>().add(PantryAddItems(items));
+    await context.read<ShoppingCubit>().clearDone();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('${items.length} item${items.length == 1 ? '' : 's'} added to your pantry'),
+        backgroundColor: AppColors.primary,
+      ));
   }
 
   void _shareList(BuildContext ctx, List<ShoppingItem> items) {
@@ -131,11 +158,11 @@ class _ShoppingPageState extends State<ShoppingPage> {
   }
 
   String _qtyLabel(ShoppingItem i) {
-    if (i.quantity == 1 && i.unit == 'pcs') return '';
+    if (i.quantity == 1 && (i.unit == 'pcs' || i.unit == 'item')) return '';
     final qty = i.quantity == i.quantity.truncateToDouble()
         ? i.quantity.toInt().toString()
         : i.quantity.toString();
-    return '$qty ${i.unit} ';
+    return '$qty ${i.unit == 'pcs' ? '×' : i.unit} ';
   }
 
   List<String> _typeaheadMatches() {
@@ -153,237 +180,292 @@ class _ShoppingPageState extends State<ShoppingPage> {
     final matches = _typeaheadMatches();
 
     return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Header ───────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 16, 0),
-            child: Row(
-              children: [
-                Text('Shopping List',
-                    style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? AppColors.darkInk : AppColors.ink)),
-                const Spacer(),
-                BlocBuilder<PantryBloc, PantryState>(
-                  buildWhen: (_, s) => s is ShoppingLoaded,
-                  builder: (context, state) {
-                    if (state is! ShoppingLoaded || state.items.isEmpty) return const SizedBox.shrink();
-                    return IconButton(
-                      icon: const Icon(Icons.share_outlined),
-                      color: AppColors.primary,
-                      onPressed: () => _shareList(context, state.items),
-                      tooltip: 'Share list',
-                    );
-                  },
-                ),
-                BlocBuilder<PantryBloc, PantryState>(
-                  buildWhen: (_, s) => s is ShoppingLoaded,
-                  builder: (context, state) {
-                    final hasDone = state is ShoppingLoaded && state.items.any((i) => i.isChecked);
-                    if (!hasDone) return const SizedBox.shrink();
-                    return TextButton(
-                      onPressed: () => context.read<PantryBloc>().add(ShoppingClearDone()),
-                      child: const Text('Clear done',
-                          style: TextStyle(color: AppColors.expired, fontSize: 13, fontWeight: FontWeight.w600)),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          // ── Add row ───────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: TextField(
-              controller: _nameCtrl,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                hintText: 'Add item...',
-                prefixIcon: Icon(Icons.add, color: AppColors.primary),
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
-              ),
-              onSubmitted: (_) => _addItem(),
-            ),
-          ),
-
-          // ── Type-ahead chips ──────────────────────────────────────────────
-          if (matches.isNotEmpty)
+      child: BlocListener<PantryBloc, PantryState>(
+        listenWhen: (a, b) => b is PantryLoaded,
+        listener: (_, __) => _loadUsedUp(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header ─────────────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: matches.map((s) => ActionChip(
-                  label: Text(s, style: const TextStyle(fontSize: 12)),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  backgroundColor: isDark ? AppColors.darkCard : AppColors.card,
-                  side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border),
-                  onPressed: () {
-                    _nameCtrl.text = s;
-                    _nameCtrl.selection = TextSelection.collapsed(offset: s.length);
-                  },
-                )).toList(),
+              padding: const EdgeInsets.fromLTRB(20, 20, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Shopping list',
+                            style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? AppColors.darkInk : AppColors.ink)),
+                        const SizedBox(height: 2),
+                        Text('We check it against what you already have.',
+                            style: TextStyle(
+                                fontSize: 13, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted)),
+                      ],
+                    ),
+                  ),
+                  BlocBuilder<ShoppingCubit, ShoppingState>(
+                    builder: (context, state) {
+                      if (state.items.isEmpty) return const SizedBox.shrink();
+                      return IconButton(
+                        icon: const Icon(Icons.share_outlined),
+                        color: AppColors.primary,
+                        onPressed: () => _shareList(context, state.items),
+                        tooltip: 'Share list',
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
 
-          // ── Qty + unit + Add ──────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 52,
-                  child: TextField(
-                    controller: _qtyCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    textAlign: TextAlign.center,
-                    decoration: InputDecoration(
-                      hintText: '1',
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                      fillColor: isDark ? AppColors.darkCard : AppColors.card,
+            // ── Add row ────────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _nameCtrl,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        hintText: 'Add item...',
+                        prefixIcon: Icon(Icons.add, color: AppColors.primary),
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      onSubmitted: (_) => _addItem(),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _unit,
-                    isDense: true,
-                    borderRadius: BorderRadius.circular(10),
-                    items: _units
-                        .map((u) => DropdownMenuItem(
-                              value: u,
-                              child: Text(u, style: const TextStyle(fontSize: 13)),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setState(() => _unit = v!),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _addItem,
+                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 20)),
+                      child: const Text('Add'),
+                    ),
                   ),
-                ),
-                const Spacer(),
-                ElevatedButton(
-                  onPressed: _addItem,
-                  style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14)),
-                  child: const Text('Add'),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // ── Restock suggestions from pantry ───────────────────────────────
-          BlocBuilder<PantryBloc, PantryState>(
-            buildWhen: (_, s) => s is ShoppingLoaded,
-            builder: (context, state) {
-              final shoppingNames = state is ShoppingLoaded
-                  ? state.items.map((i) => i.name.toLowerCase()).toSet()
-                  : <String>{};
-              final toShow = _restock
-                  .where((i) => !shoppingNames.contains(i.name.toLowerCase()))
-                  .toList();
-              if (toShow.isEmpty) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'RESTOCK SOON',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: toShow.map((item) {
-                          final isExpired = item.expiryStatus == ExpiryStatus.expired;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: ActionChip(
-                              avatar: Text(foodEmoji(item.name, item.category),
-                                  style: const TextStyle(fontSize: 14)),
-                              label: Text(item.name,
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                              backgroundColor: isExpired
-                                  ? AppColors.expired.withValues(alpha: 0.10)
-                                  : AppColors.expiringSoon.withValues(alpha: 0.12),
-                              side: BorderSide(
-                                color: isExpired
-                                    ? AppColors.expired.withValues(alpha: 0.4)
-                                    : AppColors.expiringSoon.withValues(alpha: 0.5),
-                              ),
-                              onPressed: () => _addFromPantry(item),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Divider(
-                        height: 1,
-                        color: isDark ? AppColors.darkBorder : AppColors.border),
-                  ],
+            if (matches.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: matches
+                      .map((s) => ActionChip(
+                            label: Text(s, style: const TextStyle(fontSize: 12)),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            backgroundColor: isDark ? AppColors.darkCard : AppColors.card,
+                            side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border),
+                            onPressed: () {
+                              _nameCtrl.text = s;
+                              _nameCtrl.selection = TextSelection.collapsed(offset: s.length);
+                            },
+                          ))
+                      .toList(),
                 ),
-              );
-            },
-          ),
+              ),
 
-          // ── List ──────────────────────────────────────────────────────────
-          Expanded(
-            child: BlocBuilder<PantryBloc, PantryState>(
-              buildWhen: (_, s) => s is ShoppingLoaded,
-              builder: (context, state) {
-                if (state is! ShoppingLoaded) {
-                  return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-                }
-                if (state.items.isEmpty) return _buildEmpty();
-                final unchecked = state.items.where((i) => !i.isChecked).toList();
-                final checked = state.items.where((i) => i.isChecked).toList();
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                  itemCount: unchecked.length + checked.length,
-                  itemBuilder: (context, i) {
-                    final item = i < unchecked.length ? unchecked[i] : checked[i - unchecked.length];
-                    return _ShoppingItemTile(item: item, isDark: isDark);
-                  },
-                );
-              },
+            // ── Smart suggestions ──────────────────────────────────────────
+            _Suggestions(usedUp: _usedUp, onAdd: (n) => _addItem(overrideName: n)),
+
+            // ── List ───────────────────────────────────────────────────────
+            Expanded(
+              child: BlocBuilder<ShoppingCubit, ShoppingState>(
+                builder: (context, state) {
+                  if (!state.loaded) {
+                    return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+                  }
+                  if (state.items.isEmpty) return _buildEmpty();
+                  final unchecked = state.items.where((i) => !i.isChecked).toList();
+                  final checked = state.items.where((i) => i.isChecked).toList();
+                  return Column(
+                    children: [
+                      if (checked.isNotEmpty)
+                        _BoughtBar(
+                          count: checked.length,
+                          onMove: () => _moveBoughtToPantry(checked),
+                          onClear: () => context.read<ShoppingCubit>().clearDone(),
+                        ),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                          itemCount: unchecked.length + checked.length,
+                          itemBuilder: (context, i) {
+                            final item = i < unchecked.length ? unchecked[i] : checked[i - unchecked.length];
+                            return _ShoppingItemTile(item: item, isDark: isDark);
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildEmpty() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(color: AppColors.primarySurface, borderRadius: BorderRadius.circular(20)),
+              child: const Icon(Icons.shopping_cart_outlined, size: 40, color: AppColors.primary),
+            ),
+            const SizedBox(height: 16),
+            const Text('List is empty', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            const Text(
+              'Add what you need — or open a recipe on the Cook tab and add just what it is missing.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.inkMuted, height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Suggestions ───────────────────────────────────────────────────────────────
+
+class _Suggestions extends StatelessWidget {
+  final List<String> usedUp;
+  final void Function(String) onAdd;
+  const _Suggestions({required this.usedUp, required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<ShoppingCubit, ShoppingState>(
+      builder: (context, shopping) {
+        final onList = shopping.items.where((i) => !i.isChecked).map((i) => i.name.toLowerCase().trim()).toSet();
+        return BlocBuilder<PantryBloc, PantryState>(
+          builder: (context, pantryState) {
+            return BlocBuilder<RecipeBloc, RecipeState>(
+              builder: (context, recipeState) {
+                final pantry = pantryState is PantryLoaded ? pantryState.allItems : <PantryItem>[];
+                final recipes = recipeState is RecipeLoaded ? recipeState.all : <Recipe>[];
+                final pick = PantryInsights.tonightPick(recipes, pantry);
+
+                final forRecipe = (pick?.missingNames ?? <String>[])
+                    .where((n) => !onList.contains(n.toLowerCase().trim()))
+                    .toList();
+                final ranOut = usedUp.where((n) => !onList.contains(n.toLowerCase().trim())).toList();
+
+                if (forRecipe.isEmpty && ranOut.isEmpty) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (forRecipe.isNotEmpty) ...[
+                        _label(context, 'FOR ${pick!.recipe.name.toUpperCase()}'),
+                        _chips(context, forRecipe),
+                      ],
+                      if (ranOut.isNotEmpty) ...[
+                        _label(context, 'RAN OUT RECENTLY'),
+                        _chips(context, ranOut),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _label(BuildContext context, String text) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 6),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted,
+        ),
+      ),
+    );
+  }
+
+  Widget _chips(BuildContext context, List<String> names) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: names
+            .map((n) => Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ActionChip(
+                    avatar: Text(foodEmoji(n, GroceryOcrParser.guessCategory(n)), style: const TextStyle(fontSize: 14)),
+                    label: Text(n, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    backgroundColor: AppColors.primarySurface,
+                    side: BorderSide(color: AppColors.primary.withValues(alpha: 0.35)),
+                    onPressed: () => onAdd(n),
+                  ),
+                ))
+            .toList(),
+      ),
+    );
+  }
+}
+
+/// Shown once something is ticked: closes the loop from shop to pantry.
+class _BoughtBar extends StatelessWidget {
+  final int count;
+  final VoidCallback onMove, onClear;
+  const _BoughtBar({required this.count, required this.onMove, required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: AppColors.primarySurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+      ),
+      child: Row(
         children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-                color: AppColors.primarySurface,
-                borderRadius: BorderRadius.circular(20)),
-            child: const Icon(Icons.shopping_cart_outlined,
-                size: 40, color: AppColors.primary),
+          Expanded(
+            child: Text(
+              'Bought $count item${count == 1 ? '' : 's'}?',
+              style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primaryDark),
+            ),
           ),
-          const SizedBox(height: 16),
-          const Text('List is empty',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          const Text('Type an item above and tap Add',
-              style: TextStyle(color: AppColors.inkMuted)),
+          TextButton(
+            onPressed: onClear,
+            child: const Text('Clear done', style: TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            onPressed: onMove,
+            style: ElevatedButton.styleFrom(minimumSize: const Size(0, 38), padding: const EdgeInsets.symmetric(horizontal: 14)),
+            child: const Text('Add to pantry'),
+          ),
         ],
       ),
     );
@@ -403,7 +485,7 @@ class _ShoppingItemTile extends StatelessWidget {
     final qty = item.quantity == item.quantity.truncateToDouble()
         ? item.quantity.toInt().toString()
         : item.quantity.toString();
-    return '$qty ${item.unit}';
+    return trivialUnits.contains(item.unit.toLowerCase()) ? '× $qty' : '$qty ${item.unit}';
   }
 
   @override
@@ -415,8 +497,7 @@ class _ShoppingItemTile extends StatelessWidget {
         motion: const DrawerMotion(),
         children: [
           SlidableAction(
-            onPressed: (_) =>
-                context.read<PantryBloc>().add(ShoppingDeleteItem(item.id)),
+            onPressed: (_) => context.read<ShoppingCubit>().delete(item.id),
             backgroundColor: AppColors.expired,
             foregroundColor: Colors.white,
             icon: Icons.delete_outline,
@@ -430,40 +511,28 @@ class _ShoppingItemTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : AppColors.card,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: isDark ? AppColors.darkBorder : AppColors.border),
+          border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
         ),
         child: ListTile(
-          leading: Text(foodEmoji(item.name, item.category),
-              style: const TextStyle(fontSize: 22)),
+          leading: Text(foodEmoji(item.name, item.category), style: const TextStyle(fontSize: 22)),
           title: Text(
             item.name,
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              decoration:
-                  item.isChecked ? TextDecoration.lineThrough : null,
-              color: item.isChecked
-                  ? AppColors.inkLight
-                  : (isDark ? AppColors.darkInk : AppColors.ink),
+              decoration: item.isChecked ? TextDecoration.lineThrough : null,
+              color: item.isChecked ? AppColors.inkLight : (isDark ? AppColors.darkInk : AppColors.ink),
             ),
           ),
           subtitle: sub.isEmpty
               ? null
               : Text(sub,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: isDark
-                          ? AppColors.darkInkMuted
-                          : AppColors.inkMuted)),
+                  style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted)),
           trailing: Checkbox(
             value: item.isChecked,
-            onChanged: (val) => context
-                .read<PantryBloc>()
-                .add(ShoppingToggleItem(item.id, val ?? false)),
+            onChanged: (val) => context.read<ShoppingCubit>().toggle(item.id, val ?? false),
             activeColor: AppColors.primary,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           ),
         ),
       ),

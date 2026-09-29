@@ -1,7 +1,7 @@
 name: pantrypal
 description: Smart pantry manager — scan receipts, track expiry, reduce food waste.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.2+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -25,6 +25,9 @@ dependencies:
 
   # Subscriptions
   purchases_flutter: ^8.0.0
+
+  # App Store review prompt
+  in_app_review: ^2.0.12
   url_launcher: ^6.3.1
 
   # Barcode scanning
@@ -66,7 +69,11 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
   flutter_lints: ^4.0.0
+  bloc_test: ^9.1.7
+  sqflite_common_ffi: ^2.3.3
   flutter_launcher_icons: ^0.14.3
 
 flutter_launcher_icons:

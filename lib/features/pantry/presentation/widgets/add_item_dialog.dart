@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pantrypal/core/constants/app_constants.dart';
+import 'package:pantrypal/core/constants/starter_foods.dart';
+import 'package:pantrypal/core/utils/grocery_ocr_parser.dart';
 import 'package:pantrypal/core/theme/app_theme.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 import 'package:uuid/uuid.dart';
@@ -23,7 +25,34 @@ class _AddItemDialogState extends State<AddItemDialog> {
   FoodCategory _category = FoodCategory.other;
   StorageLocation _location = StorageLocation.fridge;
   String _unit = 'item';
-  DateTime _expiryDate = DateTime.now().add(const Duration(days: 7));
+  DateTime _expiryDate = PantryItem.expiryInDays(7);
+
+  // Once the user chooses something themselves, typing the name stops
+  // overriding it.
+  bool _pickedCategory = false, _pickedLocation = false, _pickedDate = false;
+
+  int get _daysLeft {
+    final n = DateTime.now();
+    return DateTime.utc(_expiryDate.year, _expiryDate.month, _expiryDate.day)
+        .difference(DateTime.utc(n.year, n.month, n.day))
+        .inDays;
+  }
+
+  /// Fills category, storage place and expiry from the typed name so the
+  /// common case is: type a name, tap Add.
+  void _autofillFromName(String name) {
+    if (widget.existing != null || name.trim().length < 3) return;
+    final starter = starterFoodFor(name);
+    final cat = starter?.category ?? GroceryOcrParser.guessCategory(name);
+    setState(() {
+      if (!_pickedCategory) _category = cat;
+      if (!_pickedLocation) _location = starter?.location ?? cat.defaultLocation;
+      if (!_pickedDate) {
+        final days = starter?.shelfDays ?? AppConstants.defaultShelfLife[cat.name] ?? 14;
+        _expiryDate = PantryItem.expiryInDays(days);
+      }
+    });
+  }
 
   final List<String> _units = ['item', 'kg', 'g', 'lb', 'oz', 'L', 'ml', 'pack', 'box', 'can', 'bottle', 'bunch'];
 
@@ -54,7 +83,6 @@ class _AddItemDialogState extends State<AddItemDialog> {
 
   PantryItem _buildItem() {
     final existing = widget.existing;
-    final defaultDays = AppConstants.defaultShelfLife[_category.name] ?? 14;
     return PantryItem(
       id: existing?.id ?? _uuid.v4(),
       name: _nameCtrl.text.trim(),
@@ -142,7 +170,9 @@ class _AddItemDialogState extends State<AddItemDialog> {
                   // Name
                   TextField(
                     controller: _nameCtrl,
+                    autofocus: widget.existing == null,
                     textCapitalization: TextCapitalization.words,
+                    onChanged: _autofillFromName,
                     decoration: const InputDecoration(
                       labelText: 'Item name *',
                       prefixIcon: Icon(Icons.edit_outlined),
@@ -189,9 +219,13 @@ class _AddItemDialogState extends State<AddItemDialog> {
                         onTap: () {
                           setState(() {
                             _category = cat;
+                            _pickedCategory = true;
                             if (widget.existing == null) {
-                              final days = AppConstants.defaultShelfLife[cat.name] ?? 14;
-                              _expiryDate = DateTime.now().add(Duration(days: days));
+                              if (!_pickedLocation) _location = cat.defaultLocation;
+                              if (!_pickedDate) {
+                                final days = AppConstants.defaultShelfLife[cat.name] ?? 14;
+                                _expiryDate = PantryItem.expiryInDays(days);
+                              }
                             }
                           });
                         },
@@ -239,7 +273,10 @@ class _AddItemDialogState extends State<AddItemDialog> {
                       final selected = loc == _location;
                       return Expanded(
                         child: GestureDetector(
-                          onTap: () => setState(() => _location = loc),
+                          onTap: () => setState(() {
+                            _location = loc;
+                            _pickedLocation = true;
+                          }),
                           child: Container(
                             margin: const EdgeInsets.only(right: 8),
                             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -280,10 +317,16 @@ class _AddItemDialogState extends State<AddItemDialog> {
                       final picked = await showDatePicker(
                         context: context,
                         initialDate: _expiryDate,
-                        firstDate: DateTime.now(),
+                        // Allow past dates so an already-expired item can be edited.
+                        firstDate: DateTime.now().subtract(const Duration(days: 365)),
                         lastDate: DateTime.now().add(const Duration(days: 3650)),
                       );
-                      if (picked != null) setState(() => _expiryDate = picked);
+                      if (picked != null) {
+                        setState(() {
+                          _expiryDate = DateTime(picked.year, picked.month, picked.day, 12);
+                          _pickedDate = true;
+                        });
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -305,7 +348,7 @@ class _AddItemDialogState extends State<AddItemDialog> {
                           ),
                           const Spacer(),
                           Text(
-                            '${_expiryDate.difference(DateTime.now()).inDays} days',
+                            _daysLeft < 0 ? 'expired' : '$_daysLeft days',
                             style: const TextStyle(
                               fontSize: 13,
                               color: AppColors.primary,

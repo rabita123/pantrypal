@@ -5,6 +5,7 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:pantrypal/app.dart';
 import 'package:pantrypal/injection_container.dart';
 import 'package:pantrypal/shared/services/notification_service.dart';
+import 'package:pantrypal/shared/services/review_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +22,7 @@ void main() async {
 
   await setupDependencies();
   await NotificationService.instance.init();
+  await ReviewService.instance.recordSession();
 
   final rcApiKey =
       Platform.isIOS ? 'appl_vldzueYBTHHQdGdeSsRyRKpEvJN' : 'goog_XXXXXXXXXX';

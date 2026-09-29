@@ -2,33 +2,34 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
+import 'package:pantrypal/core/config/backend_config.dart';
 import 'package:pantrypal/core/constants/app_constants.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 
 class ReceiptScanService {
-  static const _supabaseUrl = 'https://hwkaxobdmyiyodtgrpio.supabase.co';
-  static const _supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3a2F4b2JkbXlpeW9kdGdycGlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMjEyNjcsImV4cCI6MjA5NTc5NzI2N30.naKIQOSgMjP_-yM5fiNpiwpkSB2SuNHha9uVSTJF4Ug';
-
   static Future<List<Map<String, dynamic>>> analyzeReceipt(
       String imagePath) async {
     final base64Image = await _prepareImage(imagePath);
     final ext = imagePath.toLowerCase();
     final mediaType = ext.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
-    final response = await http.post(
-      Uri.parse('$_supabaseUrl/functions/v1/analyze-receipt'),
-      headers: {
-        'Authorization': 'Bearer $_supabaseAnonKey',
-        'apikey': _supabaseAnonKey,
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({'image': base64Image, 'mediaType': mediaType}),
-    ).timeout(const Duration(seconds: 45));
+    final http.Response response;
+    try {
+      response = await http
+          .post(
+            BackendConfig.function('analyze-receipt'),
+            headers: BackendConfig.headers,
+            body: jsonEncode({'image': base64Image, 'mediaType': mediaType}),
+          )
+          .timeout(const Duration(seconds: 45));
+    } catch (e) {
+      throw BackendException.from(e);
+    }
 
     if (response.statusCode != 200) {
-      final body = jsonDecode(response.body);
-      throw Exception(body['error'] ?? 'Server error ${response.statusCode}');
+      throw BackendException(
+          'The scan service is unavailable right now (${response.statusCode}). '
+          'Please try again shortly.');
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;

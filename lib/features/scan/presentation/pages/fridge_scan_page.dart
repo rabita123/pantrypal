@@ -73,7 +73,7 @@ class _FridgeScanPageState extends State<FridgeScanPage> {
         location: StorageLocation.fridge,
         quantity: (m['quantity'] as double?) ?? 1.0,
         unit: (m['unit'] as String?) ?? 'item',
-        expiryDate: now.add(Duration(days: days)),
+        expiryDate: PantryItem.expiryInDays(days, from: now),
         addedDate: now,
         isConsumed: false,
         isWasted: false,
@@ -81,14 +81,7 @@ class _FridgeScanPageState extends State<FridgeScanPage> {
     }).toList();
 
     context.read<PantryBloc>().add(PantryAddItems(pantryItems));
-    Navigator.pop(context, true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${pantryItems.length} item${pantryItems.length == 1 ? '' : 's'} added from fridge scan 🎉'),
-        backgroundColor: AppColors.primary,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    Navigator.pop(context, pantryItems);
   }
 
   @override
@@ -374,7 +367,7 @@ class _ReviewView extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'AI found ${items.length} items · Tap to deselect any you don\'t want',
+                  'Found ${items.length} items. Tap any you don\'t want to skip it.',
                   style: const TextStyle(fontSize: 12, color: AppColors.primary, height: 1.4),
                 ),
               ),
@@ -475,7 +468,7 @@ class _ReviewView extends StatelessWidget {
                       elevation: 0,
                     ),
                     child: Text(
-                      'Add ${selected.length} item${selected.length == 1 ? '' : 's'} to pantry',
+                      'Add ${selected.length} item${selected.length == 1 ? '' : 's'}',
                       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                     ),
                   ),

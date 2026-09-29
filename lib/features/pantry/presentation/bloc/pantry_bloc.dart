@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pantrypal/features/pantry/data/repositories/pantry_repository.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
+import 'package:pantrypal/shared/services/notification_service.dart';
 import 'package:pantrypal/shared/services/widget_service.dart';
 
 // ── Events ────────────────────────────────────────────────────────────────────
@@ -52,26 +53,6 @@ class PantryAddItems extends PantryEvent {
   PantryAddItems(this.items);
 }
 
-// Shopping events
-class ShoppingLoad extends PantryEvent {}
-class ShoppingAddItem extends PantryEvent {
-  final ShoppingItem item;
-  ShoppingAddItem(this.item);
-  @override List<Object?> get props => [item];
-}
-class ShoppingToggleItem extends PantryEvent {
-  final String id;
-  final bool checked;
-  ShoppingToggleItem(this.id, this.checked);
-  @override List<Object?> get props => [id, checked];
-}
-class ShoppingDeleteItem extends PantryEvent {
-  final String id;
-  ShoppingDeleteItem(this.id);
-  @override List<Object?> get props => [id];
-}
-class ShoppingClearDone extends PantryEvent {}
-
 // ── States ────────────────────────────────────────────────────────────────────
 
 abstract class PantryState extends Equatable {
@@ -108,12 +89,6 @@ class PantryError extends PantryState {
   @override List<Object?> get props => [message];
 }
 
-class ShoppingLoaded extends PantryState {
-  final List<ShoppingItem> items;
-  ShoppingLoaded(this.items);
-  @override List<Object?> get props => [items];
-}
-
 // ── BLoC ──────────────────────────────────────────────────────────────────────
 
 class PantryBloc extends Bloc<PantryEvent, PantryState> {
@@ -130,15 +105,11 @@ class PantryBloc extends Bloc<PantryEvent, PantryState> {
     on<PantryMarkConsumed>(_onMarkConsumed);
     on<PantryMarkWasted>(_onMarkWasted);
     on<PantryDeleteItem>(_onDelete);
-    on<ShoppingLoad>(_onShoppingLoad);
-    on<ShoppingAddItem>(_onShoppingAdd);
-    on<ShoppingToggleItem>(_onShoppingToggle);
-    on<ShoppingDeleteItem>(_onShoppingDelete);
-    on<ShoppingClearDone>(_onShoppingClearDone);
   }
 
   Future<void> _onLoad(PantryLoad event, Emitter<PantryState> emit) async {
-    emit(PantryLoading());
+    // Reloads after marking something used must not flash a spinner.
+    if (state is! PantryLoaded) emit(PantryLoading());
     try {
       final items = await _repository.getAllItems();
       final expiring = await _repository.getExpiringItems(days: 7);
@@ -153,6 +124,7 @@ class PantryBloc extends Bloc<PantryEvent, PantryState> {
         expiringItems: expiring,
         totalItems: items.length,
       ).ignore();
+      NotificationService.instance.refreshDigest(items).ignore();
     } catch (e) {
       emit(PantryError(e.toString()));
     }
@@ -254,30 +226,5 @@ class PantryBloc extends Bloc<PantryEvent, PantryState> {
   Future<void> _onDelete(PantryDeleteItem event, Emitter<PantryState> emit) async {
     await _repository.deleteItem(event.id);
     add(PantryLoad());
-  }
-
-  Future<void> _onShoppingLoad(ShoppingLoad event, Emitter<PantryState> emit) async {
-    final items = await _repository.getShoppingItems();
-    emit(ShoppingLoaded(items));
-  }
-
-  Future<void> _onShoppingAdd(ShoppingAddItem event, Emitter<PantryState> emit) async {
-    await _repository.addShoppingItem(event.item);
-    add(ShoppingLoad());
-  }
-
-  Future<void> _onShoppingToggle(ShoppingToggleItem event, Emitter<PantryState> emit) async {
-    await _repository.toggleShoppingItem(event.id, event.checked);
-    add(ShoppingLoad());
-  }
-
-  Future<void> _onShoppingDelete(ShoppingDeleteItem event, Emitter<PantryState> emit) async {
-    await _repository.deleteShoppingItem(event.id);
-    add(ShoppingLoad());
-  }
-
-  Future<void> _onShoppingClearDone(ShoppingClearDone event, Emitter<PantryState> emit) async {
-    await _repository.clearChecked();
-    add(ShoppingLoad());
   }
 }

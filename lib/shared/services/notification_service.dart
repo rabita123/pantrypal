@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -16,7 +17,7 @@ class NotificationService {
   final _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
-  /// Set this to handle a notification tap — opens Cook Tonight page for the expiring item.
+  /// Set this to handle a notification tap — opens Cook Tonight for the expiring items.
   static void Function(String? itemName)? onNotificationTap;
 
   Future<void> init() async {
@@ -25,10 +26,12 @@ class NotificationService {
     final localTz = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(localTz));
     const android = AndroidInitializationSettings('@drawable/ic_notification');
+    // Permission is requested later, at a moment the user understands
+    // (see requestPermission) — never as a bare system dialog at launch.
     const darwin = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
       defaultPresentAlert: true,
       defaultPresentBadge: true,
       defaultPresentSound: true,
@@ -48,11 +51,156 @@ class NotificationService {
           description: 'Alerts for food items expiring soon',
           importance: Importance.high,
         ));
-    // Explicitly request iOS permission
-    await _plugin
+    _initialized = true;
+  }
+
+  /// Shows the system permission dialog. Call right after telling the user
+  /// what they will get. Returns whether notifications are allowed.
+  Future<bool> requestPermission() async {
+    if (!_initialized) await init();
+    final ios = await _plugin
         .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
         ?.requestPermissions(alert: true, badge: true, sound: true);
-    _initialized = true;
+    final android = await _plugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
+    return ios ?? android ?? false;
+  }
+
+  // ── Daily "use it up" digest ──────────────────────────────────────────────
+  //
+  // One quiet evening notification on the days something needs using — not two
+  // per item. A 30-item receipt used to schedule 60 alerts and blow through
+  // iOS's 64-pending limit; this never schedules more than [_digestDays].
+
+  static const _digestBaseId = 500000;
+  static const _digestDays = 14;
+  static const prefReminderEnabled = 'reminder_enabled';
+  static const prefReminderHour = 'reminder_hour';
+  static const prefReminderMinute = 'reminder_minute';
+
+  Future<({bool enabled, int hour, int minute})> reminderSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (
+      enabled: prefs.getBool(prefReminderEnabled) ?? true,
+      hour: prefs.getInt(prefReminderHour) ?? 18,
+      minute: prefs.getInt(prefReminderMinute) ?? 0,
+    );
+  }
+
+  Future<void> saveReminderSettings({
+    required bool enabled,
+    required int hour,
+    required int minute,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(prefReminderEnabled, enabled);
+    await prefs.setInt(prefReminderHour, hour);
+    await prefs.setInt(prefReminderMinute, minute);
+  }
+
+  /// Rebuilds the next two weeks of digests from what is in the pantry now.
+  /// Safe to call after every change; failures never reach the user.
+  Future<void> refreshDigest(List<PantryItem> items) async {
+    try {
+      if (!_initialized) await init();
+      for (var i = 0; i < _digestDays; i++) {
+        await _plugin.cancel(_digestBaseId + i);
+      }
+      final settings = await reminderSettings();
+      if (!settings.enabled) return;
+
+      final active = items.where((i) => i.isActive).toList();
+      if (active.isEmpty) return;
+
+      final now = tz.TZDateTime.now(tz.local);
+      for (var d = 0; d < _digestDays; d++) {
+        final day = tz.TZDateTime(tz.local, now.year, now.month, now.day + d,
+            settings.hour, settings.minute);
+        if (!day.isAfter(now)) continue;
+
+        final content = digestContent(active, DateTime(day.year, day.month, day.day));
+        if (content == null) continue;
+
+        await _plugin.zonedSchedule(
+          _digestBaseId + d,
+          content.title,
+          content.body,
+          day,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              AppConstants.expiryChannelId,
+              AppConstants.expiryChannelName,
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
+            iOS: DarwinNotificationDetails(presentAlert: true, presentBadge: true),
+          ),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: 'digest',
+        );
+      }
+    } catch (e) {
+      debugPrint('[NotificationService] refreshDigest failed: $e');
+    }
+  }
+
+  /// What the digest for [day] should say, or null when nothing needs using
+  /// that day. Items count if they expire within 2 days of [day]; on the
+  /// first day anything already past its date is included too.
+  @visibleForTesting
+  static ({String title, String body})? digestContent(
+    List<PantryItem> items,
+    DateTime day,
+  ) {
+    final dayUtc = DateTime.utc(day.year, day.month, day.day);
+    final today = DateTime.now();
+    final isFirstDay = day.year == today.year &&
+        day.month == today.month &&
+        day.day == today.day;
+
+    final due = <(PantryItem, int)>[];
+    for (final item in items) {
+      final e = item.expiryDate;
+      final left = DateTime.utc(e.year, e.month, e.day).difference(dayUtc).inDays;
+      if (left >= 0 && left <= 2 || (isFirstDay && left < 0)) due.add((item, left));
+    }
+    if (due.isEmpty) return null;
+    due.sort((a, b) => a.$2.compareTo(b.$2));
+
+    String when(int left) => left < 0
+        ? 'expired'
+        : left == 0
+            ? 'today'
+            : left == 1
+                ? 'tomorrow'
+                : 'in $left days';
+
+    final shown = due.take(3).map((d) => '${d.$1.name} (${when(d.$2)})').join(', ');
+    final extra = due.length > 3 ? ' +${due.length - 3} more' : '';
+    final title = due.length == 1
+        ? 'Use up ${due.first.$1.name} ${when(due.first.$2)}'
+        : '${due.length} things to use up soon';
+    return (
+      title: title,
+      body: '$shown$extra. Tap for a dinner idea that uses them.',
+    );
+  }
+
+  /// One-off clean-up of the old per-item reminders (v1) so they stop firing.
+  Future<void> migrateLegacyReminders() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('digest_v2') ?? false) return;
+    try {
+      if (!_initialized) await init();
+      await _plugin.cancelAll();
+    } catch (e) {
+      debugPrint('[NotificationService] legacy cleanup failed: $e');
+    }
+    await prefs.setBool('weekly_report_scheduled', false);
+    await prefs.setBool('digest_v2', true);
   }
 
   static int _instantId = 111100;
@@ -80,74 +228,6 @@ class NotificationService {
         ),
       ),
     );
-  }
-
-  Future<void> scheduleExpiryReminder(PantryItem item) async {
-    if (!_initialized) await init();
-    final baseId = item.id.hashCode.abs() % 100000000;
-
-    // Always fire at 9:00 AM on the reminder day — not at the random time the item was added
-    tz.TZDateTime at9am(DateTime date) {
-      final d = tz.TZDateTime(tz.local, date.year, date.month, date.day, 9, 0);
-      // If 9am today has already passed, shift to tomorrow's 9am
-      return d.isBefore(tz.TZDateTime.now(tz.local)) ? d.add(const Duration(days: 1)) : d;
-    }
-
-    // 2 days before expiry at 9am
-    final twoDayDate = item.expiryDate.subtract(const Duration(days: 2));
-    final twoDayAt9 = at9am(twoDayDate);
-    if (twoDayAt9.isAfter(tz.TZDateTime.now(tz.local))) {
-      await _plugin.zonedSchedule(
-        baseId,
-        '${item.category.emoji} ${item.name} expires in 2 days',
-        'Tap to find recipes using it before it expires.',
-        twoDayAt9,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            AppConstants.expiryChannelId,
-            AppConstants.expiryChannelName,
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          iOS: DarwinNotificationDetails(presentAlert: true, presentBadge: true),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: item.name,
-      );
-    }
-
-    // 1 day before expiry at 9am
-    final oneDayDate = item.expiryDate.subtract(const Duration(days: 1));
-    final oneDayAt9 = at9am(oneDayDate);
-    if (oneDayAt9.isAfter(tz.TZDateTime.now(tz.local))) {
-      await _plugin.zonedSchedule(
-        baseId + 1,
-        '${item.category.emoji} ${item.name} expires tomorrow! Use it today.',
-        'Tap to see recipes you can make with it right now.',
-        oneDayAt9,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            AppConstants.expiryChannelId,
-            AppConstants.expiryChannelName,
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          iOS: DarwinNotificationDetails(presentAlert: true, presentBadge: true),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: item.name,
-      );
-    }
-  }
-
-  Future<void> cancelReminder(String itemId) async {
-    final baseId = itemId.hashCode.abs() % 100000000;
-    await _plugin.cancel(baseId);
-    await _plugin.cancel(baseId + 1);
   }
 
   Future<void> cancelAll() => _plugin.cancelAll();

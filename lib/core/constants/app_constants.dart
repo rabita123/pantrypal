@@ -1,6 +1,7 @@
 class AppConstants {
   static const dbName = 'pantrypal.db';
-  static const dbVersion = 1;
+  static const dbVersion = 2;
+  static const appVersion = '1.0.2';
   static const itemsTable = 'pantry_items';
   static const shoppingTable = 'shopping_items';
 

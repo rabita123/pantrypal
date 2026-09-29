@@ -24,6 +24,35 @@ enum FoodCategory {
       orElse: () => FoodCategory.other,
     );
   }
+
+  /// Where this kind of food normally lives — used so a scan never asks the
+  /// user to sort rice into the fridge.
+  StorageLocation get defaultLocation => switch (this) {
+        FoodCategory.dairy ||
+        FoodCategory.eggs ||
+        FoodCategory.meat ||
+        FoodCategory.vegetables ||
+        FoodCategory.fruits =>
+          StorageLocation.fridge,
+        FoodCategory.frozen => StorageLocation.freezer,
+        _ => StorageLocation.pantry,
+      };
+
+  /// Rough shelf price in dollars, used only to estimate how much money an
+  /// item without a price represents. Always shown as an estimate ("~").
+  double get averagePrice => switch (this) {
+        FoodCategory.dairy => 3.5,
+        FoodCategory.eggs => 3.5,
+        FoodCategory.meat => 8.0,
+        FoodCategory.vegetables => 2.5,
+        FoodCategory.fruits => 3.0,
+        FoodCategory.grains => 3.0,
+        FoodCategory.frozen => 5.0,
+        FoodCategory.beverages => 3.0,
+        FoodCategory.snacks => 3.5,
+        FoodCategory.condiments => 3.5,
+        FoodCategory.other => 3.0,
+      };
 }
 
 enum ExpiryStatus { fresh, expiringSoon, expired }
@@ -79,15 +108,37 @@ class PantryItem extends Equatable {
     required this.isWasted,
   });
 
-  ExpiryStatus get expiryStatus {
+  /// An expiry date [days] from today, pinned to midday so the calendar day
+  /// is unambiguous whatever the time of adding.
+  static DateTime expiryInDays(int days, {DateTime? from}) {
+    final now = from ?? DateTime.now();
+    return DateTime(now.year, now.month, now.day + days, 12);
+  }
+
+  /// Calendar days until expiry (0 = today, negative = already expired).
+  ///
+  /// Counted in calendar days, not 24-hour blocks: an item added this
+  /// afternoon with 3 days of life reads "3 days", not "2".
+  int get daysUntilExpiry {
     final now = DateTime.now();
-    final daysLeft = expiryDate.difference(now).inDays;
-    if (now.isAfter(expiryDate)) return ExpiryStatus.expired;
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final expiry = DateTime.utc(expiryDate.year, expiryDate.month, expiryDate.day);
+    return expiry.difference(today).inDays;
+  }
+
+  ExpiryStatus get expiryStatus {
+    final daysLeft = daysUntilExpiry;
+    if (daysLeft < 0) return ExpiryStatus.expired;
     if (daysLeft <= 3) return ExpiryStatus.expiringSoon;
     return ExpiryStatus.fresh;
   }
 
-  int get daysUntilExpiry => expiryDate.difference(DateTime.now()).inDays;
+  /// What this item is worth: its real price when known, otherwise an
+  /// estimate from its category.
+  double get estimatedValue => price ?? category.averagePrice;
+
+  /// Whether [estimatedValue] is a guess rather than a scanned/typed price.
+  bool get isValueEstimated => price == null;
 
   bool get isActive => !isConsumed && !isWasted;
 

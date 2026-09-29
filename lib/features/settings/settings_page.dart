@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pantrypal/core/theme/app_theme.dart';
 import 'package:pantrypal/core/utils/database_helper.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
-import 'package:pantrypal/features/subscription/presentation/paywall_page.dart';
+import 'package:pantrypal/core/constants/app_constants.dart';
+import 'package:pantrypal/features/pantry/data/repositories/pantry_repository.dart';
+import 'package:pantrypal/features/subscription/presentation/paywall_gate.dart';
+import 'package:pantrypal/features/subscription/services/subscription_service.dart';
+import 'package:pantrypal/injection_container.dart';
+import 'package:pantrypal/shared/services/notification_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -44,6 +48,11 @@ class _SettingsPageState extends State<SettingsPage> {
           // ── Subscription ────────────────────────────────────────────────
           _SectionHeader(label: 'Subscription', isDark: isDark),
           _SubscriptionCard(isDark: isDark),
+          const SizedBox(height: 8),
+
+          // ── Reminders ───────────────────────────────────────────────────
+          _SectionHeader(label: 'Reminders', isDark: isDark),
+          _RemindersTile(isDark: isDark),
           const SizedBox(height: 8),
 
           // ── Legal ───────────────────────────────────────────────────────
@@ -98,7 +107,7 @@ class _SettingsPageState extends State<SettingsPage> {
           _SettingsTile(
             icon: Icons.info_outline,
             label: 'Version',
-            subtitle: '1.0.0',
+            subtitle: AppConstants.appVersion,
             isDark: isDark,
             showChevron: false,
           ),
@@ -122,7 +131,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         content: Text(
-          'This will permanently remove all pantry items, shopping lists, and reset your scan count. This cannot be undone.',
+          'This will permanently remove all pantry items and shopping lists. This cannot be undone.',
           style: TextStyle(
             fontSize: 14,
             height: 1.5,
@@ -150,9 +159,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (confirmed != true || !mounted) return;
 
+    // Scan allowance is deliberately NOT reset: wiping data must not be a
+    // way to get free scans back.
     await DatabaseHelper.instance.clearAllData();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('free_scan_count');
 
     if (!mounted) return;
     context.read<PantryBloc>().add(PantryLoad());
@@ -214,7 +223,7 @@ class _PremiumBadge extends StatelessWidget {
           children: [
             Text('Premium Active', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
             SizedBox(height: 2),
-            Text('Unlimited scans & features', style: TextStyle(color: Colors.white70, fontSize: 13)),
+            Text('Unlimited scans & AI recipes', style: TextStyle(color: Colors.white70, fontSize: 13)),
           ],
         ),
       ],
@@ -230,7 +239,6 @@ class _FreePlanInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext ctx) {
-    final cubit = ctx.read<SubscriptionCubit>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -248,23 +256,22 @@ class _FreePlanInfo extends StatelessWidget {
             ),
             const Spacer(),
             Text(
-              '$scansUsed / 1 scan used',
+              '${(SubscriptionService.freeScansAllowed - scansUsed).clamp(0, SubscriptionService.freeScansAllowed)} of ${SubscriptionService.freeScansAllowed} AI scans left',
               style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted),
             ),
           ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Barcode, quick add, reminders, recipes and your shopping list are always free.',
+          style: TextStyle(fontSize: 12, height: 1.4, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted),
         ),
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           height: 44,
           child: ElevatedButton.icon(
-            onPressed: () => Navigator.push(
-              ctx,
-              MaterialPageRoute(
-                fullscreenDialog: true,
-                builder: (_) => BlocProvider.value(value: cubit, child: const PaywallPage()),
-              ),
-            ),
+            onPressed: () => PaywallGate.show(ctx),
             icon: const Icon(Icons.workspace_premium, size: 18),
             label: const Text('Upgrade to Premium', style: TextStyle(fontWeight: FontWeight.w700)),
             style: ElevatedButton.styleFrom(
@@ -363,6 +370,93 @@ class _SettingsTile extends StatelessWidget {
           onTap: onTap,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
+      ),
+    );
+  }
+}
+
+
+// ── Reminders ─────────────────────────────────────────────────────────────────
+
+class _RemindersTile extends StatefulWidget {
+  final bool isDark;
+  const _RemindersTile({required this.isDark});
+
+  @override
+  State<_RemindersTile> createState() => _RemindersTileState();
+}
+
+class _RemindersTileState extends State<_RemindersTile> {
+  bool _enabled = true;
+  TimeOfDay _time = const TimeOfDay(hour: 18, minute: 0);
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final s = await NotificationService.instance.reminderSettings();
+    if (!mounted) return;
+    setState(() {
+      _enabled = s.enabled;
+      _time = TimeOfDay(hour: s.hour, minute: s.minute);
+      _loaded = true;
+    });
+  }
+
+  Future<void> _save() async {
+    await NotificationService.instance.saveReminderSettings(
+      enabled: _enabled,
+      hour: _time.hour,
+      minute: _time.minute,
+    );
+    if (_enabled) await NotificationService.instance.requestPermission();
+    final items = await sl<PantryRepository>().getAllItems();
+    await NotificationService.instance.refreshDigest(items);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final ink = isDark ? AppColors.darkInk : AppColors.ink;
+    final muted = isDark ? AppColors.darkInkMuted : AppColors.inkMuted;
+    if (!_loaded) return const SizedBox(height: 56);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+      ),
+      child: Column(
+        children: [
+          SwitchListTile(
+            value: _enabled,
+            activeColor: AppColors.primary,
+            title: Text('Evening reminder', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: ink)),
+            subtitle: Text('One notification when food needs using', style: TextStyle(fontSize: 12, color: muted)),
+            onChanged: (v) {
+              setState(() => _enabled = v);
+              _save();
+            },
+          ),
+          if (_enabled)
+            ListTile(
+              leading: const Icon(Icons.schedule, color: AppColors.primary, size: 22),
+              title: Text('Time', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: ink)),
+              trailing: Text(_time.format(context),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
+              onTap: () async {
+                final picked = await showTimePicker(context: context, initialTime: _time);
+                if (picked == null) return;
+                setState(() => _time = picked);
+                _save();
+              },
+            ),
+        ],
       ),
     );
   }

@@ -1,18 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pantrypal/core/theme/app_theme.dart';
+import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
+import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
+import 'package:pantrypal/features/subscription/services/subscription_service.dart';
+
+/// Why the paywall is being shown — the headline speaks to that moment.
+enum PaywallReason { general, scanLimit, recipeLimit }
 
 class PaywallPage extends StatelessWidget {
-  final bool isLimitReached;
-  const PaywallPage({super.key, this.isLimitReached = false});
+  final PaywallReason reason;
+  const PaywallPage({super.key, this.reason = PaywallReason.general});
+
+  String get _headline => switch (reason) {
+        PaywallReason.scanLimit => "You've used your ${SubscriptionService.freeScansAllowed} free scans",
+        PaywallReason.recipeLimit => 'Want another rescue recipe?',
+        PaywallReason.general => 'Stop throwing money in the bin',
+      };
+
+  String get _subline => switch (reason) {
+        PaywallReason.scanLimit =>
+          'Keep filling your pantry from a receipt or fridge photo in seconds.',
+        PaywallReason.recipeLimit =>
+          'The free plan includes ${SubscriptionService.freeRecipesPerWeek} AI recipe a week. Premium makes them unlimited.',
+        PaywallReason.general =>
+          'Fill your pantry from a photo and get a recipe for whatever is about to expire.',
+      };
+
+  /// Money currently at risk in the user's own pantry — the honest reason to
+  /// subscribe. Null when there is nothing to show.
+  double? _atRisk(BuildContext context) {
+    final state = context.read<PantryBloc>().state;
+    if (state is! PantryLoaded) return null;
+    final total = state.allItems
+        .where((i) => i.expiryStatus == ExpiryStatus.expiringSoon)
+        .fold<double>(0, (sum, i) => sum + i.estimatedValue);
+    return total >= 1 ? total : null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = isDark ? AppColors.darkInk : AppColors.ink;
+    final muted = isDark ? AppColors.darkInkMuted : AppColors.inkMuted;
+    final atRisk = _atRisk(context);
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBg : AppColors.surface,
@@ -23,10 +59,7 @@ class PaywallPage extends StatelessWidget {
           }
           if (state is SubscriptionError) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.expired,
-              ),
+              SnackBar(content: Text(state.message), backgroundColor: AppColors.expired),
             );
           }
         },
@@ -37,65 +70,73 @@ class PaywallPage extends StatelessWidget {
             children: [
               SafeArea(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
+                  padding: const EdgeInsets.fromLTRB(24, 56, 24, 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Container(
-                        width: 80,
-                        height: 80,
+                        width: 64,
+                        height: 64,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [AppColors.primary, AppColors.primaryDark],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(18),
                         ),
-                        child: const Icon(Icons.workspace_premium, color: Colors.white, size: 44),
+                        child: const Icon(Icons.workspace_premium, color: Colors.white, size: 34),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 18),
                       Text(
-                        'Go Premium',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? AppColors.darkInk : AppColors.ink,
-                        ),
+                        _headline,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: ink, height: 1.2),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        isLimitReached
-                            ? "You've used all 3 free scans.\nUpgrade for unlimited scanning."
-                            : "Unlock unlimited scanning, expiry alerts,\nand everything PantryPal has to offer.",
+                        _subline,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted,
-                          height: 1.5,
-                        ),
+                        style: TextStyle(fontSize: 15, color: muted, height: 1.5),
                       ),
-                      const SizedBox(height: 28),
-                      _FeatureCard(isDark: isDark),
-                      const SizedBox(height: 24),
-                      if (isLoading)
-                        const CircularProgressIndicator(color: AppColors.primary)
-                      else
-                        _PackageOptions(state: state, isDark: isDark),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: isLoading
-                            ? null
-                            : () => context.read<SubscriptionCubit>().restore(),
-                        child: Text(
-                          'Restore Purchases',
-                          style: TextStyle(
-                            color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted,
-                            fontSize: 13,
+                      if (atRisk != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: AppColors.expiringSoonSurface,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'You have about \$${atRisk.toStringAsFixed(0)} of food to use soon',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.expiringSoon,
+                            ),
                           ),
                         ),
+                      ],
+                      const SizedBox(height: 22),
+                      _BenefitCard(isDark: isDark),
+                      const SizedBox(height: 20),
+                      if (isLoading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: CircularProgressIndicator(color: AppColors.primary),
+                        )
+                      else
+                        _PackageOptions(state: state, isDark: isDark),
+                      const SizedBox(height: 4),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text('Not now', style: TextStyle(color: muted, fontSize: 14, fontWeight: FontWeight.w600)),
                       ),
-                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: isLoading ? null : () => context.read<SubscriptionCubit>().restore(),
+                        child: Text('Restore Purchases', style: TextStyle(color: muted, fontSize: 12)),
+                      ),
+                      const SizedBox(height: 4),
                       _LegalFooter(isDark: isDark),
                     ],
                   ),
@@ -109,7 +150,8 @@ class PaywallPage extends StatelessWidget {
                     padding: const EdgeInsets.all(8),
                     child: IconButton(
                       icon: const Icon(Icons.close),
-                      color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted,
+                      color: muted,
+                      tooltip: 'Close',
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ),
@@ -123,56 +165,71 @@ class PaywallPage extends StatelessWidget {
   }
 }
 
-class _FeatureCard extends StatelessWidget {
+/// Only what Premium actually unlocks — nothing that is free anyway.
+class _BenefitCard extends StatelessWidget {
   final bool isDark;
-  const _FeatureCard({required this.isDark});
+  const _BenefitCard({required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    const features = [
-      (Icons.all_inclusive, 'Unlimited receipt scans'),
-      (Icons.kitchen_outlined, 'Full pantry tracking'),
-      (Icons.notifications_active_outlined, 'Expiry alerts'),
-      (Icons.menu_book_outlined, 'Recipe management & suggestions'),
+    const benefits = [
+      (Icons.document_scanner_outlined, 'Unlimited receipt & fridge scans', 'Fill your pantry in seconds, every shop'),
+      (Icons.auto_awesome_outlined, 'Unlimited AI rescue recipes', 'A dinner idea for whatever expires next'),
     ];
+    final ink = isDark ? AppColors.darkInk : AppColors.ink;
+    final muted = isDark ? AppColors.darkInkMuted : AppColors.inkMuted;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.card,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: features
-            .map((f) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primarySurface,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(f.$1, size: 16, color: AppColors.primary),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        f.$2,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? AppColors.darkInk : AppColors.ink,
-                        ),
-                      ),
-                    ],
+        children: [
+          for (final b in benefits)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: const BoxDecoration(color: AppColors.primarySurface, shape: BoxShape.circle),
+                    child: Icon(b.$1, size: 19, color: AppColors.primary),
                   ),
-                ))
-            .toList(),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(b.$2, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: ink)),
+                        const SizedBox(height: 1),
+                        Text(b.$3, style: TextStyle(fontSize: 12, color: muted)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle, size: 16, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Expiry reminders, Use This First, recipes and your shopping list stay free.',
+                    style: TextStyle(fontSize: 12, color: muted, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -190,58 +247,98 @@ class _PackageOptions extends StatefulWidget {
 class _PackageOptionsState extends State<_PackageOptions> {
   Package? _selected;
 
+  static int _rank(Package p) => switch (p.packageType) {
+        PackageType.annual => 0,
+        PackageType.monthly => 1,
+        PackageType.weekly => 2,
+        _ => 3,
+      };
+
   List<Package> _packages() {
     if (widget.state is! SubscriptionReady) return [];
     final offering = (widget.state as SubscriptionReady).offerings?.current;
     if (offering == null) return [];
-    return offering.availablePackages;
+    return [...offering.availablePackages]..sort((a, b) => _rank(a).compareTo(_rank(b)));
   }
 
-  String _label(Package p) {
-    switch (p.packageType) {
-      case PackageType.weekly:
-        return 'Weekly';
-      case PackageType.monthly:
-        return 'Monthly';
-      case PackageType.annual:
-        return 'Annual';
-      default:
-        return p.identifier;
+  String _label(Package p) => switch (p.packageType) {
+        PackageType.weekly => 'Weekly',
+        PackageType.monthly => 'Monthly',
+        PackageType.annual => 'Yearly',
+        _ => p.identifier,
+      };
+
+  String _period(Package p) => switch (p.packageType) {
+        PackageType.weekly => 'week',
+        PackageType.monthly => 'month',
+        PackageType.annual => 'year',
+        _ => 'period',
+      };
+
+  /// Free-trial length in days, or null when the plan has no free trial.
+  int? _trialDays(Package p) {
+    final intro = p.storeProduct.introductoryPrice;
+    if (intro == null || intro.price != 0) return null;
+    final n = intro.periodNumberOfUnits * (intro.cycles < 1 ? 1 : intro.cycles);
+    return switch (intro.periodUnit) {
+      PeriodUnit.day => n,
+      PeriodUnit.week => n * 7,
+      PeriodUnit.month => n * 30,
+      PeriodUnit.year => n * 365,
+      _ => null,
+    };
+  }
+
+  String? _perMonth(Package p) {
+    if (p.packageType != PackageType.annual) return null;
+    try {
+      return NumberFormat.simpleCurrency(name: p.storeProduct.currencyCode)
+          .format(p.storeProduct.price / 12);
+    } catch (_) {
+      return null;
     }
   }
 
-  String _period(Package p) {
-    switch (p.packageType) {
-      case PackageType.weekly:
-        return 'week';
-      case PackageType.monthly:
-        return 'month';
-      case PackageType.annual:
-        return 'year';
-      default:
-        return 'period';
-    }
+  /// "Save 60%" for the yearly plan versus paying monthly.
+  String? _saving(Package p, List<Package> all) {
+    if (p.packageType != PackageType.annual) return null;
+    final monthly = all.where((x) => x.packageType == PackageType.monthly).firstOrNull;
+    if (monthly == null || monthly.storeProduct.price <= 0) return null;
+    final pct = (1 - p.storeProduct.price / (monthly.storeProduct.price * 12)) * 100;
+    return pct >= 10 ? 'Save ${pct.round()}%' : null;
   }
 
   @override
   Widget build(BuildContext context) {
     final packages = _packages();
+    final isDark = widget.isDark;
+    final ink = isDark ? AppColors.darkInk : AppColors.ink;
+    final muted = isDark ? AppColors.darkInkMuted : AppColors.inkMuted;
 
     if (packages.isEmpty) {
-      return const Text(
-        'No plans available. Check back soon.',
+      return Text(
+        'Plans are unavailable right now. Check your connection and try again.',
         textAlign: TextAlign.center,
-        style: TextStyle(color: AppColors.inkMuted, fontSize: 13),
+        style: TextStyle(color: muted, fontSize: 13),
       );
     }
 
-    // Auto-select first package if nothing selected yet
+    // Yearly first and pre-selected: the plan that is best for the user is
+    // also the one that sustains the app.
     _selected ??= packages.first;
+    final selected = packages.firstWhere(
+      (p) => p.identifier == _selected!.identifier,
+      orElse: () => packages.first,
+    );
+    final trial = _trialDays(selected);
 
     return Column(
       children: [
         ...packages.map((p) {
-          final isSelected = _selected?.identifier == p.identifier;
+          final isSelected = selected.identifier == p.identifier;
+          final saving = _saving(p, packages);
+          final perMonth = _perMonth(p);
+          final planTrial = _trialDays(p);
           return GestureDetector(
             onTap: () => setState(() => _selected = p),
             child: AnimatedContainer(
@@ -249,50 +346,54 @@ class _PackageOptionsState extends State<_PackageOptions> {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primarySurface : (widget.isDark ? AppColors.darkCard : AppColors.card),
+                color: isSelected ? AppColors.primarySurface : (isDark ? AppColors.darkCard : AppColors.card),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : (widget.isDark ? AppColors.darkBorder : AppColors.border),
+                  color: isSelected ? AppColors.primary : (isDark ? AppColors.darkBorder : AppColors.border),
                   width: isSelected ? 2 : 1,
                 ),
               ),
               child: Row(
                 children: [
+                  Icon(
+                    isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                    color: isSelected ? AppColors.primary : muted,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _label(p),
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: widget.isDark ? AppColors.darkInk : AppColors.ink,
-                          ),
+                        Row(
+                          children: [
+                            Text(_label(p), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: isSelected ? AppColors.primaryDark : ink)),
+                            if (saving != null) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(8)),
+                                child: Text(saving, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
+                              ),
+                            ],
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Auto-renews · Cancel anytime',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: widget.isDark ? AppColors.darkInkMuted : AppColors.inkMuted,
+                        if (planTrial != null || perMonth != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            [
+                              if (planTrial != null) '$planTrial-day free trial',
+                              if (perMonth != null) '$perMonth / month',
+                            ].join(' · '),
+                            style: TextStyle(fontSize: 12, color: muted),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '${p.storeProduct.priceString} / ${_period(p)}',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: isSelected ? AppColors.primary : (widget.isDark ? AppColors.darkInk : AppColors.ink),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    '${p.storeProduct.priceString} / ${_period(p)}',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: isSelected ? AppColors.primary : ink),
                   ),
                 ],
               ),
@@ -302,23 +403,28 @@ class _PackageOptionsState extends State<_PackageOptions> {
         const SizedBox(height: 6),
         SizedBox(
           width: double.infinity,
-          height: 52,
+          height: 54,
           child: ElevatedButton(
-            onPressed: _selected == null
-                ? null
-                : () => context.read<SubscriptionCubit>().purchase(_selected!),
+            onPressed: () => context.read<SubscriptionCubit>().purchase(selected),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-              disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.4),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               elevation: 0,
             ),
-            child: const Text(
-              'Subscribe',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            child: Text(
+              trial != null ? 'Start $trial-day free trial' : 'Continue',
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
             ),
           ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          trial != null
+              ? 'Then ${selected.storeProduct.priceString} / ${_period(selected)}. Cancel anytime in App Store settings.'
+              : 'Cancel anytime in App Store settings.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: muted),
         ),
       ],
     );

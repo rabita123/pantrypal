@@ -3,8 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pantrypal/core/theme/app_theme.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
+import 'package:pantrypal/shared/services/review_service.dart';
+import 'package:pantrypal/shared/widgets/happy_moment_sheet.dart';
 import 'package:pantrypal/features/pantry/presentation/widgets/pantry_item_card.dart';
 import 'package:pantrypal/features/pantry/presentation/widgets/add_item_dialog.dart';
+import 'package:pantrypal/features/pantry/presentation/add_flow.dart';
+import 'package:pantrypal/features/pantry/presentation/widgets/add_food_sheet.dart';
 
 class PantryPage extends StatefulWidget {
   const PantryPage({super.key});
@@ -71,8 +75,9 @@ class _PantryPageState extends State<PantryPage> {
                     onPressed: () => setState(() => _searching = true),
                   ),
                   IconButton(
+                    tooltip: 'Add food',
                     icon: const Icon(Icons.add_circle_outline, color: AppColors.primary, size: 28),
-                    onPressed: _addItemManually,
+                    onPressed: () => AddFlow.start(context),
                   ),
                 ],
               ],
@@ -93,21 +98,53 @@ class _PantryPageState extends State<PantryPage> {
                   if (state.items.isEmpty) {
                     return _EmptyState(isSearch: state.searchQuery.isNotEmpty, query: state.searchQuery);
                   }
+                  // Group into "use first" and everything else — but only when
+                  // browsing the whole pantry, not while searching/filtering.
+                  final grouped = state.searchQuery.isEmpty && state.activeLocation == null;
+                  final urgent = grouped
+                      ? state.items.where((i) => i.daysUntilExpiry <= 3).toList()
+                      : <PantryItem>[];
+                  final rest = grouped
+                      ? state.items.where((i) => i.daysUntilExpiry > 3).toList()
+                      : state.items;
+                  final rows = <Object>[
+                    if (urgent.isNotEmpty) 'Use first · ${urgent.length}',
+                    ...urgent,
+                    if (urgent.isNotEmpty && rest.isNotEmpty) 'Everything else · ${rest.length}',
+                    ...rest,
+                  ];
                   return ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                    itemCount: state.items.length,
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
+                    itemCount: rows.length,
                     itemBuilder: (ctx, i) {
-                      final item = state.items[i];
+                      final row = rows[i];
+                      if (row is String) {
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+                          child: Text(
+                            row.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                              color: row.startsWith('Use first')
+                                  ? AppColors.expiringSoon
+                                  : (isDark ? AppColors.darkInkMuted : AppColors.inkMuted),
+                            ),
+                          ),
+                        );
+                      }
+                      final item = row as PantryItem;
                       return PantryItemCard(
                         item: item,
                         onTap: () => _editItem(ctx, item),
-                        onConsumed: () => context.read<PantryBloc>().add(PantryMarkConsumed(item.id)),
+                        onConsumed: () => _consume(ctx, item),
                         onWasted: () => context.read<PantryBloc>().add(PantryMarkWasted(item.id)),
                         onDelete: () => context.read<PantryBloc>().add(PantryDeleteItem(item.id)),
                         onFreeze: () {
                           final frozen = item.copyWith(
                             location: StorageLocation.freezer,
-                            expiryDate: DateTime.now().add(const Duration(days: 90)),
+                            expiryDate: PantryItem.expiryInDays(90),
                           );
                           context.read<PantryBloc>().add(PantryUpdateItem(frozen));
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -131,16 +168,14 @@ class _PantryPageState extends State<PantryPage> {
     );
   }
 
-  Future<void> _addItemManually() async {
-    final item = await showModalBottomSheet<PantryItem>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const AddItemDialog(),
-    );
-    if (item != null && mounted) {
-      context.read<PantryBloc>().add(PantryAddItem(item));
-    }
+
+  /// Using something before it expired is the app working as intended — the
+  /// one place a review request is genuinely earned.
+  Future<void> _consume(BuildContext context, PantryItem item) async {
+    context.read<PantryBloc>().add(PantryMarkConsumed(item.id));
+    await ReviewService.instance.recordHappyMoment();
+    if (!context.mounted) return;
+    await HappyMomentSheet.maybeShow(context);
   }
 
   Future<void> _editItem(BuildContext context, PantryItem existing) async {
@@ -240,9 +275,26 @@ class _EmptyState extends StatelessWidget {
           children: [
             Icon(isSearch ? Icons.search_off : Icons.kitchen_outlined, size: 64, color: AppColors.inkLight),
             const SizedBox(height: 16),
-            Text(isSearch ? 'No results for "$query"' : 'Nothing here yet', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Text(isSearch ? 'No results for "$query"' : 'Nothing here yet',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            Text(isSearch ? 'Try a different search' : 'Add items manually or scan a receipt', style: const TextStyle(color: AppColors.inkMuted, fontSize: 14), textAlign: TextAlign.center),
+            Text(
+              isSearch ? 'Try a different search' : 'Scan a receipt and your whole shop is added in seconds.',
+              style: const TextStyle(color: AppColors.inkMuted, fontSize: 14, height: 1.4),
+              textAlign: TextAlign.center,
+            ),
+            if (!isSearch) ...[
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () => AddFlow.run(context, AddKind.receipt),
+                icon: const Icon(Icons.document_scanner_outlined),
+                label: const Text('Scan a receipt'),
+              ),
+              TextButton(
+                onPressed: () => AddFlow.run(context, AddKind.tap),
+                child: const Text('or tap what you have'),
+              ),
+            ],
           ],
         ),
       ),

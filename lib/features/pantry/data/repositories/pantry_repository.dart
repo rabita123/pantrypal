@@ -1,10 +1,8 @@
 import 'package:pantrypal/core/utils/database_helper.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
-import 'package:pantrypal/shared/services/notification_service.dart';
 
 class PantryRepository {
   final _db = DatabaseHelper.instance;
-  final _notifications = NotificationService.instance;
 
   Future<List<PantryItem>> getAllItems() => _db.getAllActiveItems();
   Future<List<PantryItem>> getItemsByLocation(StorageLocation loc) =>
@@ -16,31 +14,19 @@ class PantryRepository {
 
   Future<PantryItem> addItem(PantryItem item) async {
     await _db.insertItem(item);
-    await _notifications.scheduleExpiryReminder(item);
     return item;
   }
 
   Future<PantryItem> updateItem(PantryItem item) async {
     await _db.updateItem(item);
-    await _notifications.cancelReminder(item.id);
-    await _notifications.scheduleExpiryReminder(item);
     return item;
   }
 
-  Future<void> markConsumed(String id) async {
-    await _db.markConsumed(id);
-    await _notifications.cancelReminder(id);
-  }
-
-  Future<void> markWasted(String id) async {
-    await _db.markWasted(id);
-    await _notifications.cancelReminder(id);
-  }
-
-  Future<void> deleteItem(String id) async {
-    await _db.deleteItem(id);
-    await _notifications.cancelReminder(id);
-  }
+  Future<void> markConsumed(String id) => _db.markConsumed(id);
+  Future<void> markWasted(String id) => _db.markWasted(id);
+  Future<void> deleteItem(String id) => _db.deleteItem(id);
+  Future<List<PantryItem>> getRecentlyConsumed({int days = 30}) =>
+      _db.getRecentlyConsumed(withinDays: days);
 
   // Shopping
   Future<List<ShoppingItem>> getShoppingItems() => _db.getAllShoppingItems();

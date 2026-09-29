@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:pantrypal/core/theme/app_theme.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 import 'package:pantrypal/features/recipes/data/ai_recipe_service.dart';
+import 'package:pantrypal/features/subscription/presentation/paywall_gate.dart';
+import 'package:pantrypal/features/subscription/services/subscription_service.dart';
+import 'package:pantrypal/injection_container.dart';
 
 class AIRecipePage extends StatefulWidget {
   final List<PantryItem> pantryItems;
@@ -39,10 +42,19 @@ class _AIRecipePageState extends State<AIRecipePage> {
     }
   }
 
+  /// "Try another" is a new recipe, so it is subject to the weekly allowance.
+  Future<void> _tryAnother() async {
+    if (!await PaywallGate.ensureRecipeAllowed(context) || !mounted) return;
+    _rotateMsgs();
+    await _generate();
+  }
+
   Future<void> _generate() async {
     setState(() { _loading = true; _error = ''; _msgIndex = 0; });
     try {
       final recipe = await AIRecipeService.generate(widget.pantryItems);
+      // Only a recipe the user actually received counts against the free week.
+      await sl<SubscriptionService>().recordRecipeGenerated();
       if (!mounted) return;
       setState(() { _recipe = recipe; _loading = false; });
     } catch (e) {
@@ -65,7 +77,7 @@ class _AIRecipePageState extends State<AIRecipePage> {
         actions: [
           if (!_loading)
             TextButton.icon(
-              onPressed: _generate,
+              onPressed: _tryAnother,
               icon: const Icon(Icons.refresh, size: 18),
               label: const Text('Try another'),
               style: TextButton.styleFrom(foregroundColor: AppColors.primary),
