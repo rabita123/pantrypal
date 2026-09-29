@@ -7,6 +7,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
+import 'package:pantrypal/features/scan/data/ai_scan_client.dart';
 import 'package:pantrypal/features/scan/data/scan_bloc.dart';
 
 Map<String, dynamic> parsed({
@@ -167,6 +168,80 @@ void main() {
 
       expect((bloc.state as ScanReviewReady).isOfflineFallback, isTrue);
       await bloc.close();
+    });
+  });
+
+  confidenceTests();
+}
+
+// ── Appended: confidence, removal and cancellation ───────────────────────────
+
+void confidenceTests() {
+  Map<String, dynamic> item(String name, {String confidence = 'high'}) =>
+      {...parsed(name: name), 'confidence': confidence};
+
+  group('Confidence and quick correction', () {
+    test('editing an item confirms it and ticks it', () async {
+      final bloc = ScanBloc();
+      bloc.emit(ScanReviewReady([item('Mystery', confidence: 'low')], <int>{}));
+      bloc.add(ScanUpdateItem(0, {'name': 'Miso', 'confidence': 'high'}));
+      await Future<void>.delayed(Duration.zero);
+      final s = bloc.state as ScanReviewReady;
+      expect(s.parsedItems.single['name'], 'Miso');
+      expect(s.selectedIndices, {0});
+      await bloc.close();
+    });
+
+    test('a plain edit without confirmation leaves the selection alone', () async {
+      final bloc = ScanBloc();
+      bloc.emit(ScanReviewReady([item('A'), item('B')], {0}));
+      bloc.add(ScanUpdateItem(1, {'name': 'Bee'}));
+      await Future<void>.delayed(Duration.zero);
+      expect((bloc.state as ScanReviewReady).selectedIndices, {0});
+      await bloc.close();
+    });
+
+    test('removing a row shifts the selection of the rows after it', () async {
+      final bloc = ScanBloc();
+      bloc.emit(ScanReviewReady([item('A'), item('B'), item('C'), item('D')], {0, 2, 3}));
+      bloc.add(ScanItemRemove(1));
+      await Future<void>.delayed(Duration.zero);
+      final s = bloc.state as ScanReviewReady;
+      expect(s.parsedItems.map((m) => m['name']), ['A', 'C', 'D']);
+      expect(s.selectedIndices, {0, 1, 2});
+      await bloc.close();
+    });
+
+    test('removing a selected row drops it from the selection', () async {
+      final bloc = ScanBloc();
+      bloc.emit(ScanReviewReady([item('A'), item('B')], {0, 1}));
+      bloc.add(ScanItemRemove(0));
+      await Future<void>.delayed(Duration.zero);
+      final s = bloc.state as ScanReviewReady;
+      expect(s.parsedItems.single['name'], 'B');
+      expect(s.selectedIndices, {0});
+      await bloc.close();
+    });
+
+    test('removing out of range is ignored', () async {
+      final bloc = ScanBloc();
+      bloc.emit(ScanReviewReady([item('A')], {0}));
+      bloc.add(ScanItemRemove(5));
+      await Future<void>.delayed(Duration.zero);
+      expect((bloc.state as ScanReviewReady).parsedItems.length, 1);
+      await bloc.close();
+    });
+
+    test('a fridge scan files everything in the fridge, even dry goods', () {
+      final bloc = ScanBloc(kind: ScanKind.fridge);
+      final state = ScanReviewReady([parsed(name: 'Rice', category: FoodCategory.grains)], {0});
+      expect(bloc.buildPantryItems(state).single.location, StorageLocation.fridge);
+      bloc.close();
+    });
+
+    test('the review state remembers the photo', () {
+      final s = ScanReviewReady([parsed()], {0}, imagePath: '/tmp/p.jpg');
+      expect(s.imagePath, '/tmp/p.jpg');
     });
   });
 }

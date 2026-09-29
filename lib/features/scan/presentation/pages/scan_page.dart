@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pantrypal/core/theme/app_theme.dart';
-import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
+import 'package:pantrypal/features/scan/data/ai_scan_client.dart';
 import 'package:pantrypal/features/scan/data/scan_bloc.dart';
+import 'package:pantrypal/features/scan/presentation/widgets/scan_results_view.dart';
+import 'package:pantrypal/features/scan/presentation/widgets/scanning_view.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class ScanPage extends StatelessWidget {
@@ -36,8 +38,17 @@ class _ScanView extends StatelessWidget {
       },
       child: BlocBuilder<ScanBloc, ScanState>(
         builder: (context, state) {
-          if (state is ScanProcessing) return const _ProcessingView();
-          if (state is ScanReviewReady) return _ReviewView(state: state);
+          if (state is ScanStreaming) {
+            return ScanningView(
+              kind: ScanKind.receipt,
+              imagePath: state.imagePath,
+              phase: state.phase,
+              items: state.items,
+              imageSize: state.imageSize,
+              onCancel: () => context.read<ScanBloc>().add(ScanReset()),
+            );
+          }
+          if (state is ScanReviewReady) return _Results(state: state);
           return const _CameraView();
         },
       ),
@@ -371,334 +382,30 @@ class _CaptureBtn extends StatelessWidget {
   }
 }
 
-// ── Processing View ───────────────────────────────────────────────────────────
+// ── Results ───────────────────────────────────────────────────────────────────
 
-class _ProcessingView extends StatelessWidget {
-  const _ProcessingView();
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBg : AppColors.surface,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.primarySurface,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.primary,
-                    strokeWidth: 3,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 28),
-              Text(
-                'Analysing your receipt…',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? AppColors.darkInk : AppColors.ink,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'AI is identifying food items.\nThis takes a few seconds.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.5,
-                  color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Review View ───────────────────────────────────────────────────────────────
-
-class _ReviewView extends StatelessWidget {
+class _Results extends StatelessWidget {
   final ScanReviewReady state;
-  const _ReviewView({required this.state});
+  const _Results({required this.state});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selected = state.selectedIndices.length;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Found ${state.parsedItems.length} items'),
-        actions: [
-          TextButton(
-            onPressed: selected == 0 ? null : () => _confirmAdd(context),
-            child: Text(
-              'Add $selected item${selected == 1 ? '' : 's'}',
-              style: TextStyle(
-                color: selected == 0 ? AppColors.inkLight : AppColors.primary,
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Offline fallback warning
-          if (state.isOfflineFallback)
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.expiringSoonSurface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.expiringSoon.withValues(alpha: 0.4)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.wifi_off, size: 16, color: AppColors.expiringSoon),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Offline mode — results may be less accurate. Tap ✏️ to correct any item.',
-                      style: TextStyle(fontSize: 12, color: AppColors.expiringSoon, height: 1.4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.primarySurface,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.info_outline, size: 16, color: AppColors.primary),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Everything is selected. Tap an item to skip it, or ✏️ to fix it.',
-                    style: TextStyle(fontSize: 12, color: AppColors.primary, height: 1.4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-              itemCount: state.parsedItems.length,
-              itemBuilder: (ctx, i) {
-                final item = state.parsedItems[i];
-                final isSelected = state.selectedIndices.contains(i);
-                final cat = item['category'] as FoodCategory;
-                final days = (item['estimatedExpiryDays'] as int?) ?? 7;
-                final price = item['price'] as double?;
-
-                return GestureDetector(
-                  onTap: () => ctx.read<ScanBloc>().add(ScanItemToggle(i)),
-                  child: AnimatedOpacity(
-                    opacity: isSelected ? 1.0 : 0.45,
-                    duration: const Duration(milliseconds: 200),
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.darkCard : AppColors.card,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected ? AppColors.primary : AppColors.border,
-                          width: isSelected ? 1.5 : 1,
-                        ),
-                      ),
-                      child: ListTile(
-                        leading: Text(cat.emoji, style: const TextStyle(fontSize: 26)),
-                        title: Text(
-                          item['name'] as String,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? AppColors.darkInk : AppColors.ink,
-                          ),
-                        ),
-                        subtitle: Text(
-                          '${cat.label} · Expires in ${days}d${price != null ? ' · \$${price.toStringAsFixed(2)}' : ''}',
-                          style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            GestureDetector(
-                              onTap: () => _editItem(ctx, i, item),
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                child: const Icon(Icons.edit_outlined, size: 18, color: AppColors.inkMuted),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-                              color: isSelected ? AppColors.primary : AppColors.inkLight,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => context.read<ScanBloc>().add(ScanReset()),
-                  child: const Text('Rescan'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: selected == 0 ? null : () => _confirmAdd(context),
-                  child: Text('Add $selected item${selected == 1 ? '' : 's'}'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _confirmAdd(BuildContext context) {
-    final scanBloc = context.read<ScanBloc>();
-    final items = scanBloc.buildPantryItems(state);
-    context.read<PantryBloc>().add(PantryAddItems(items));
-    // The caller shows what it all means (use-first, at-risk, cook tonight).
-    Navigator.pop(context, items);
-  }
-
-  void _editItem(BuildContext context, int index, Map<String, dynamic> item) {
-    final nameCtrl = TextEditingController(text: item['name'] as String);
-    int days = (item['estimatedExpiryDays'] as int?) ?? 7;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setState) {
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                24, 24, 24,
-                MediaQuery.of(ctx).viewInsets.bottom + 32,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        (item['category'] as FoodCategory).emoji,
-                        style: const TextStyle(fontSize: 28),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Edit Item',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Item name',
-                      border: OutlineInputBorder(),
-                    ),
-                    textCapitalization: TextCapitalization.words,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Expires in $days day${days == 1 ? '' : 's'}  '
-                    '(${_expiryLabel(days)})',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                  ),
-                  Slider(
-                    value: days.toDouble(),
-                    min: 1,
-                    max: 365,
-                    divisions: 72,
-                    activeColor: AppColors.primary,
-                    label: '$days days',
-                    onChanged: (v) => setState(() => days = v.round()),
-                  ),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('1d', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
-                      Text('30d', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
-                      Text('90d', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
-                      Text('1yr', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        context.read<ScanBloc>().add(ScanUpdateItem(index, {
-                          'name': nameCtrl.text.trim().isEmpty
-                              ? item['name']
-                              : nameCtrl.text.trim(),
-                          'estimatedExpiryDays': days,
-                        }));
-                        Navigator.pop(ctx);
-                      },
-                      child: const Text('Save'),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
+    final bloc = context.read<ScanBloc>();
+    return ScanResultsView(
+      items: state.parsedItems,
+      selected: state.selectedIndices,
+      imagePath: state.imagePath,
+      offline: state.isOfflineFallback,
+      onToggle: (i) => bloc.add(ScanItemToggle(i)),
+      onEdit: (i, changes) => bloc.add(ScanUpdateItem(i, changes)),
+      onRemove: (i) => bloc.add(ScanItemRemove(i)),
+      onRescan: () => bloc.add(ScanReset()),
+      onAdd: () {
+        final items = bloc.buildPantryItems(state);
+        context.read<PantryBloc>().add(PantryAddItems(items));
+        // The caller shows what it all means (use-first, at-risk, cook tonight).
+        Navigator.pop(context, items);
       },
     );
-  }
-
-  String _expiryLabel(int days) {
-    if (days <= 3) return 'very perishable';
-    if (days <= 7) return 'about a week';
-    if (days <= 14) return 'two weeks';
-    if (days <= 30) return 'about a month';
-    if (days <= 90) return 'a few months';
-    return 'long shelf life';
   }
 }

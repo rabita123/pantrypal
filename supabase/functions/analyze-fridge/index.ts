@@ -16,11 +16,24 @@ Each element:
   "category": "dairy|meat|vegetables|fruits|grains|frozen|beverages|snacks|condiments|other",
   "quantity": 1,
   "unit": "item|kg|g|L|ml|pack|bottle|can|bunch|loaf",
-  "estimatedExpiryDays": 7
+  "estimatedExpiryDays": 7,
+  "confidence": "high|medium|low",
+  "box": [x1, y1, x2, y2]
 }
 
+"box" is where the item is in the photo, as [left, top, right, bottom] on a 0-1000 scale
+(0,0 = top-left corner, 1000,1000 = bottom-right). Tightly around that ONE item. Omit "box" if you
+cannot place it.
+"confidence": "high" = clearly visible and certain; "medium" = fairly sure; "low" = plausible but
+partly hidden or ambiguous. Include a low-confidence item only when it is genuinely visible — the
+app will ask the user to confirm it.
+
 STRICT rules:
-- ONLY include items you can clearly and confidently identify — if unsure, skip it
+- List items in the order you find them, most obvious first
+- Only include food and drink that is actually VISIBLE in the photo. Never add items that "would
+  normally be" in a fridge
+- Count identical items together into one entry with the right quantity (3 visible eggs -> quantity 3)
+- If you cannot tell what something is, skip it or mark it "low" — never guess a specific product
 - Look carefully at color, shape, and size before naming an item (a lemon is yellow and round, an onion is brown/purple with papery skin — do not confuse them)
 - Do not guess — if an item is partially hidden or unclear, skip it
 - Do not include non-food items, containers, or appliances
@@ -35,7 +48,7 @@ serve(async (req) => {
   }
 
   try {
-    const { image, mediaType } = await req.json()
+    const { image, mediaType, stream } = await req.json()
 
     if (!image || !mediaType) {
       return new Response(
@@ -60,8 +73,9 @@ serve(async (req) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
+        model: Deno.env.get('SCAN_MODEL') ?? 'claude-sonnet-4-6',
+        max_tokens: 1400,
+        stream: stream === true,
         messages: [{
           role: 'user',
           content: [
@@ -74,6 +88,15 @@ serve(async (req) => {
         }],
       }),
     })
+
+    // Streaming: hand Anthropic's event stream straight to the app so items can
+    // appear while the model is still writing. Older app versions omit `stream`
+    // and get the single JSON reply below.
+    if (stream === true && anthropicRes.ok && anthropicRes.body) {
+      return new Response(anthropicRes.body, {
+        headers: { ...cors, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
+      })
+    }
 
     const data = await anthropicRes.json()
 

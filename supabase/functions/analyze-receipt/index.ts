@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { image, mediaType } = await req.json()
+    const { image, mediaType, stream } = await req.json()
 
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
     if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured')
@@ -24,8 +24,9 @@ serve(async (req) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
+        model: Deno.env.get('SCAN_MODEL') ?? 'claude-sonnet-4-6',
+        max_tokens: 1400,
+        stream: stream === true,
         messages: [{
           role: 'user',
           content: [
@@ -50,6 +51,9 @@ For each food/drink item return a JSON object:
 - "unit": unit of measure (kg, g, pcs, pack, item, etc.)
 - "price": price paid (use AMOUNT column if visible, otherwise null)
 - "estimatedExpiryDays": estimated days until expiry (e.g. cucumber=5, biscuit=90, pineapple=7)
+- "confidence": "high" if the line is clearly legible and clearly food, "medium" if fairly sure, "low" if the text is smudged, cut off or you are guessing what the abbreviation means
+
+Only list lines that are actually printed on the receipt. Never add items that are not there. List items in the order they appear.
 
 Return ONLY a valid JSON array. No explanation, no markdown, just the array.`,
             },
@@ -61,6 +65,15 @@ Return ONLY a valid JSON array. No explanation, no markdown, just the array.`,
     if (!response.ok) {
       const err = await response.text()
       throw new Error(`Anthropic API error: ${err}`)
+    }
+
+    // Streaming: pass Anthropic's event stream straight through so items can
+    // appear while the model is still writing. Older app versions omit `stream`
+    // and get the single JSON reply below.
+    if (stream === true && response.body) {
+      return new Response(response.body, {
+        headers: { ...corsHeaders, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
+      })
     }
 
     const data = await response.json()
