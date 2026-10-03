@@ -98,6 +98,11 @@ class Recipe extends Equatable {
   final bool isFavorite;
   final DateTime createdAt;
 
+  /// Rough per-serving estimates, only present for AI-made recipes. Shown as
+  /// "≈" figures — PantryPal is not a calorie tracker.
+  final int? kcalPerServing;
+  final int? proteinPerServing;
+
   const Recipe({
     required this.id,
     required this.name,
@@ -112,7 +117,20 @@ class Recipe extends Equatable {
     this.imageUrl,
     required this.isFavorite,
     required this.createdAt,
+    this.kcalPerServing,
+    this.proteinPerServing,
   });
+
+  bool get isAiMade => id.startsWith('ai-');
+
+  /// "≈520 kcal · 32 g protein", or null when there is no estimate.
+  String? get nutritionLabel {
+    if (kcalPerServing == null && proteinPerServing == null) return null;
+    return [
+      if (kcalPerServing != null) '≈$kcalPerServing kcal',
+      if (proteinPerServing != null) '${proteinPerServing}g protein',
+    ].join(' · ');
+  }
 
   int get totalMinutes => prepMinutes + cookMinutes;
 
@@ -151,6 +169,8 @@ class Recipe extends Equatable {
       imageUrl: imageUrl ?? this.imageUrl,
       isFavorite: isFavorite ?? this.isFavorite,
       createdAt: createdAt,
+      kcalPerServing: kcalPerServing,
+      proteinPerServing: proteinPerServing,
     );
   }
 

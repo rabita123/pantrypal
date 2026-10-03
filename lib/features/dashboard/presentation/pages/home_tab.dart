@@ -631,75 +631,100 @@ class _SavingsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = isDark ? AppColors.darkInk : AppColors.ink;
     final saved = ((stats['savedValueMonth'] as num?) ?? 0).toDouble();
     final lost = ((stats['wastedValueMonth'] as num?) ?? 0).toDouble();
     final used = (stats['consumedMonth'] as int?) ?? 0;
     final tossed = (stats['wastedMonth'] as int?) ?? 0;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkCard : AppColors.card,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  'This month',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: isDark ? AppColors.darkInk : AppColors.ink,
-                  ),
-                ),
-                const Spacer(),
-                if (used + tossed > 0)
-                  TextButton.icon(
-                    onPressed: () => showModalBottomSheet(
-                      context: context,
-                      backgroundColor: Colors.transparent,
-                      isScrollControlled: true,
-                      builder: (_) => ShareCardSheet(stats: stats),
-                    ),
-                    icon: const Icon(Icons.ios_share, size: 16),
-                    label: const Text('Share'),
-                  ),
-              ],
+    return BlocBuilder<PlanCubit, PlanState>(
+      builder: (context, plan) {
+        final m = plan.month;
+        final anything = used + tossed + m.mealsCooked + m.portionsEaten > 0;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : AppColors.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
             ),
-            const SizedBox(height: 8),
-            if (used + tossed == 0)
-              const Text(
-                'Tap "Used" on food you finish before it expires and your savings show up here.',
-                style: TextStyle(fontSize: 13, color: AppColors.inkMuted, height: 1.4),
-              )
-            else
-              Row(
-                children: [
-                  Expanded(
-                    child: _Stat(
-                      value: PantryInsights.money(saved, approx: true),
-                      label: 'saved · $used used',
-                      color: AppColors.primary,
-                    ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('This month', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: ink)),
+                    const Spacer(),
+                    if (used + tossed > 0)
+                      TextButton.icon(
+                        onPressed: () => showModalBottomSheet(
+                          context: context,
+                          backgroundColor: Colors.transparent,
+                          isScrollControlled: true,
+                          builder: (_) => ShareCardSheet(stats: stats),
+                        ),
+                        icon: const Icon(Icons.ios_share, size: 16),
+                        label: const Text('Share'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (!anything)
+                  const Text(
+                    'Tap "Used" on food you finish, or "Cooked it" on a planned meal, and what you save shows up here.',
+                    style: TextStyle(fontSize: 13, color: AppColors.inkMuted, height: 1.4),
+                  )
+                else ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _Stat(
+                          value: PantryInsights.money(saved, approx: true),
+                          label: 'saved · $used used in time',
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Expanded(
+                        child: _Stat(
+                          value: '${m.mealsCooked}',
+                          label: 'meal${m.mealsCooked == 1 ? '' : 's'} from your own food',
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
                   ),
-                  Expanded(
-                    child: _Stat(
-                      value: PantryInsights.money(lost, approx: true),
-                      label: 'wasted · $tossed tossed',
-                      color: lost > 0 ? AppColors.expired : AppColors.inkMuted,
-                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _Stat(
+                          value: '${m.portionsEaten}',
+                          label: 'leftover portion${m.portionsEaten == 1 ? '' : 's'} eaten, not binned',
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Expanded(
+                        child: _Stat(
+                          value: PantryInsights.money(lost, approx: true),
+                          label: 'wasted · ${tossed + m.portionsTossed} thrown away',
+                          color: lost > 0 ? AppColors.expired : AppColors.inkMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Money figures are estimates from typical prices, unless you entered the price.',
+                    style: TextStyle(fontSize: 11.5, color: AppColors.inkMuted, height: 1.4),
                   ),
                 ],
-              ),
-          ],
-        ),
-      ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -10,7 +10,11 @@ import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 import 'package:pantrypal/features/pantry/domain/services/pantry_insights.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/shopping_cubit.dart';
+import 'package:pantrypal/features/plan/data/plan_repository.dart';
+import 'package:pantrypal/features/plan/domain/meal_planner.dart';
+import 'package:pantrypal/features/plan/presentation/plan_cubit.dart';
 import 'package:pantrypal/features/recipes/domain/entities/recipe.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/features/recipes/domain/services/cook_tonight_service.dart';
 import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
 import 'package:pantrypal/injection_container.dart';
@@ -359,34 +363,69 @@ class _Suggestions extends StatelessWidget {
         return BlocBuilder<PantryBloc, PantryState>(
           builder: (context, pantryState) {
             return BlocBuilder<RecipeBloc, RecipeState>(
-              builder: (context, recipeState) {
-                final pantry = pantryState is PantryLoaded ? pantryState.allItems : <PantryItem>[];
-                final recipes = recipeState is RecipeLoaded ? recipeState.all : <Recipe>[];
-                final pick = PantryInsights.tonightPick(recipes, pantry);
+              builder: (context, recipeState) => BlocBuilder<PlanCubit, PlanState>(
+                builder: (context, plan) {
+                  final pantry = pantryState is PantryLoaded ? pantryState.allItems : <PantryItem>[];
+                  final recipes = recipeState is RecipeLoaded ? recipeState.all : <Recipe>[];
+                  final byId = {for (final r in recipes) r.id: r};
+                  bool notListed(String n) => !onList.contains(n.toLowerCase().trim());
 
-                final forRecipe = (pick?.missingNames ?? <String>[])
-                    .where((n) => !onList.contains(n.toLowerCase().trim()))
-                    .toList();
-                final ranOut = usedUp.where((n) => !onList.contains(n.toLowerCase().trim())).toList();
+                  // What the saved meal plan still needs, checked against the
+                  // live pantry in order — never something already owned.
+                  final planned = [
+                    for (final m in plan.meals)
+                      if (m.status == MealStatus.planned && byId[m.recipeId] != null) byId[m.recipeId]!,
+                  ];
+                  final seen = <String>{};
+                  final forPlan = <String>[
+                    for (final o in MealPlanner.evaluateSequence(planned, pantry))
+                      for (final n in o.missingNames)
+                        if (notListed(n) && seen.add(n.toLowerCase())) n,
+                  ];
 
-                if (forRecipe.isEmpty && ranOut.isEmpty) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (forRecipe.isNotEmpty) ...[
-                        _label(context, 'FOR ${pick!.recipe.name.toUpperCase()}'),
-                        _chips(context, forRecipe),
+                  // No plan yet: fall back to tonight's best idea.
+                  final pick = planned.isEmpty ? PantryInsights.tonightPick(recipes, pantry) : null;
+                  final forTonight = (pick?.missingNames ?? <String>[]).where(notListed).toList();
+                  final ranOut = usedUp.where(notListed).toList();
+
+                  if (forPlan.isEmpty && forTonight.isEmpty && ranOut.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (forPlan.isNotEmpty) ...[
+                          Row(
+                            children: [
+                              Expanded(child: _label(context, 'FOR YOUR MEAL PLAN')),
+                              TextButton(
+                                onPressed: () async {
+                                  final n = await context.read<ShoppingCubit>().addNames(forPlan);
+                                  Analytics.track('plan_missing_added', {'count': n, 'from': 'shop'});
+                                },
+                                style: TextButton.styleFrom(
+                                  minimumSize: Size.zero,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                ),
+                                child: Text('Add all ${forPlan.length}'),
+                              ),
+                            ],
+                          ),
+                          _chips(context, forPlan),
+                        ],
+                        if (forTonight.isNotEmpty) ...[
+                          _label(context, 'FOR ${pick!.recipe.name.toUpperCase()}'),
+                          _chips(context, forTonight),
+                        ],
+                        if (ranOut.isNotEmpty) ...[
+                          _label(context, 'RAN OUT RECENTLY'),
+                          _chips(context, ranOut),
+                        ],
                       ],
-                      if (ranOut.isNotEmpty) ...[
-                        _label(context, 'RAN OUT RECENTLY'),
-                        _chips(context, ranOut),
-                      ],
-                    ],
-                  ),
-                );
-              },
+                    ),
+                  );
+                },
+              ),
             );
           },
         );

@@ -81,6 +81,8 @@ class RecipeRepository {
         'imageUrl': r.imageUrl,
         'isFavorite': r.isFavorite,
         'createdAt': r.createdAt.millisecondsSinceEpoch,
+        if (r.kcalPerServing != null) 'kcal': r.kcalPerServing,
+        if (r.proteinPerServing != null) 'protein': r.proteinPerServing,
       };
 
   Map<String, dynamic> _ingToMap(RecipeIngredient i) => {
@@ -110,6 +112,8 @@ class RecipeRepository {
         imageUrl: m['imageUrl'] as String?,
         isFavorite: m['isFavorite'] as bool,
         createdAt: DateTime.fromMillisecondsSinceEpoch(m['createdAt'] as int),
+        kcalPerServing: (m['kcal'] as num?)?.toInt(),
+        proteinPerServing: (m['protein'] as num?)?.toInt(),
       );
 
   RecipeIngredient _ingFromMap(Map<String, dynamic> m) => RecipeIngredient(

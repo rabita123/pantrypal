@@ -10,6 +10,8 @@ import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/shopping_cubit.dart';
 import 'package:pantrypal/features/recipes/data/repositories/recipe_repository.dart';
 import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
+import 'package:pantrypal/features/plan/data/plan_repository.dart';
+import 'package:pantrypal/features/plan/presentation/plan_cubit.dart';
 import 'package:pantrypal/features/pantry/presentation/pages/shopping_page.dart';
 
 import '../support/di.dart';
@@ -41,6 +43,7 @@ Future<void> pumpShopping(WidgetTester tester) async {
             BlocProvider(create: (_) => PantryBloc(PantryRepository())),
             BlocProvider(create: (_) => ShoppingCubit(PantryRepository())),
             BlocProvider(create: (_) => RecipeBloc(RecipeRepository())),
+            BlocProvider(create: (_) => PlanCubit(PlanRepository(), PantryRepository())..load()),
           ],
           child: const ShoppingPage(),
         ),

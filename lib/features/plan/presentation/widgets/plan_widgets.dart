@@ -233,6 +233,7 @@ class PlanMealCard extends StatelessWidget {
                       '${meal.isBatch ? 'Makes' : 'Serves'} ${meal.servings}',
                       if (o != null) o.recipe.timeLabel,
                       if (o != null) o.noShopping ? 'No shopping' : '${o.missingCount} to buy',
+                      if (o?.recipe.kcalPerServing != null) '≈${o!.recipe.kcalPerServing} kcal',
                     ].join(' · '),
                     style: TextStyle(
                       fontSize: 13,

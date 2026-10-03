@@ -27,7 +27,8 @@ class OpenFoodFactsService {
           .timeout(const Duration(seconds: 8));
 
       if (response.statusCode != 200) return null;
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      // UTF-8 regardless of headers, so names like "Café" stay intact.
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
       if (data['status'] != 1) return null;
 
       final product = data['product'] as Map<String, dynamic>;

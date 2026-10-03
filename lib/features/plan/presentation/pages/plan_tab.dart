@@ -9,11 +9,11 @@ import 'package:pantrypal/features/pantry/presentation/bloc/shopping_cubit.dart'
 import 'package:pantrypal/features/plan/data/plan_repository.dart';
 import 'package:pantrypal/features/plan/domain/meal_planner.dart';
 import 'package:pantrypal/features/plan/presentation/pages/batch_cook_page.dart';
+import 'package:pantrypal/features/plan/presentation/pages/leftover_rescue_page.dart';
 import 'package:pantrypal/features/plan/presentation/plan_cubit.dart';
 import 'package:pantrypal/features/plan/presentation/widgets/plan_widgets.dart';
 import 'package:pantrypal/features/recipes/domain/entities/recipe.dart';
 import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
-import 'package:pantrypal/features/recipes/presentation/pages/ai_recipe_page.dart';
 import 'package:pantrypal/features/recipes/presentation/pages/recipe_detail_page.dart';
 import 'package:pantrypal/features/recipes/presentation/pages/recipes_page.dart';
 import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
@@ -290,12 +290,13 @@ class _PlanTabState extends State<PlanTab> {
                     ),
                     _ToolCard(
                       emoji: '✨',
-                      title: 'Rescue recipe with AI',
-                      subtitle: 'An idea for the food that expires first',
-                      onTap: () async {
-                        if (!await PaywallGate.ensureRecipeAllowed(context) || !context.mounted) return;
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => AIRecipePage(pantryItems: pantry)));
-                      },
+                      title: 'Leftover rescue',
+                      subtitle: 'Pick what needs using — get 3 meal ideas',
+                      badge: premium ? null : '1 FREE / WEEK',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LeftoverRescuePage()),
+                      ),
                     ),
                   ],
                   _ToolCard(

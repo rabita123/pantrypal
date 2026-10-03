@@ -389,22 +389,24 @@ void main() {
   });
 
   group('E2E: AI backend reachability', () {
-    testWidgets('Smart Recipe reaches its backend', (tester) async {
+    testWidgets('Leftover rescue reaches its backend', (tester) async {
       await launchApp(tester);
       await openTab(tester, 'Pantry');
-      await addItemManually(tester, 'E2E Milk');
-      await openTab(tester, 'Use first');
-
+      await addItemManually(tester, 'E2E Spinach');
       await openTab(tester, 'Plan');
-      final smart = find.text('Rescue recipe with AI');
-      if (smart.evaluate().isEmpty) {
-        markTestSkipped('AI recipe entry point not on the Plan tab');
+
+      final rescue = find.text('Leftover rescue');
+      if (rescue.evaluate().isEmpty) {
+        markTestSkipped('Leftover rescue entry point not on the Plan tab');
         return;
       }
-      await tester.tap(smart.first);
-      await settle(tester, timeout: const Duration(seconds: 20));
+      await tester.tap(rescue.first);
+      await settle(tester, timeout: const Duration(seconds: 2));
+      await tester.tap(find.text('E2E Spinach').first);
+      await tester.tap(find.textContaining('Get 3'));
+      await settle(tester, timeout: const Duration(seconds: 25));
 
-      expect(find.text('Could not generate recipe'), findsNothing,
+      expect(find.textContaining('unavailable'), findsNothing,
           reason: 'the AI backend must be reachable from the device');
     });
   });

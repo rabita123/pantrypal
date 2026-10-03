@@ -85,6 +85,17 @@ class PortionBatch extends Equatable {
   List<Object?> get props => [id, remaining, location, eatBy];
 }
 
+/// This month's cooking, for the insights card.
+class PlanMonthStats extends Equatable {
+  final int mealsCooked;
+  final int portionsEaten;
+  final int portionsTossed;
+  const PlanMonthStats({this.mealsCooked = 0, this.portionsEaten = 0, this.portionsTossed = 0});
+
+  @override
+  List<Object?> get props => [mealsCooked, portionsEaten, portionsTossed];
+}
+
 class PlanRepository {
   final _db = DatabaseHelper.instance;
   static const _prefHousehold = 'household_size';
@@ -208,6 +219,26 @@ class PlanRepository {
     await db.rawUpdate(
       'UPDATE ${AppConstants.portionsTable} SET tossed = tossed + remaining, remaining = 0, finished_at = ? WHERE id = ?',
       [DateTime.now().millisecondsSinceEpoch, id],
+    );
+  }
+
+  Future<PlanMonthStats> monthStats({DateTime? now}) async {
+    final db = await _db.database;
+    final t = now ?? DateTime.now();
+    final start = DateTime(t.year, t.month).millisecondsSinceEpoch;
+    final cooked = (await db.rawQuery(
+      'SELECT COUNT(*) AS n FROM ${AppConstants.mealsTable} WHERE status = ? AND date >= ?',
+      [MealStatus.cooked.name, start],
+    )).first['n'] as int? ?? 0;
+    final p = (await db.rawQuery(
+      'SELECT COALESCE(SUM(total - remaining - tossed), 0) AS eaten, COALESCE(SUM(tossed), 0) AS tossed '
+      'FROM ${AppConstants.portionsTable} WHERE cooked_at >= ?',
+      [start],
+    )).first;
+    return PlanMonthStats(
+      mealsCooked: cooked,
+      portionsEaten: (p['eaten'] as num?)?.toInt() ?? 0,
+      portionsTossed: (p['tossed'] as num?)?.toInt() ?? 0,
     );
   }
 

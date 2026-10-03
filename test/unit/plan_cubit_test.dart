@@ -181,4 +181,43 @@ void main() {
     final today = DateTime.now();
     expect(DateTime(m.date.year, m.date.month, m.date.day), DateTime(today.year, today.month, today.day));
   });
+
+  moreTests();
+}
+
+void moreTests() {
+  group('Month stats and adding meals', () {
+    late PlanCubit cubit;
+    setUp(() async {
+      stubSharedPreferences();
+      await DatabaseHelper.instance.clearAllData();
+      cubit = PlanCubit(PlanRepository(), PantryRepository());
+      await cubit.load();
+    });
+    tearDown(() => cubit.close());
+
+    test('addMeal puts a recipe on tonight at the household size', () async {
+      await cubit.setHousehold(3);
+      await cubit.addMeal(recipe(id: 'ai-1', name: 'Spinach Omelette'));
+      final m = cubit.state.meals.single;
+      expect(m.recipeName, 'Spinach Omelette');
+      expect(m.servings, 3);
+      final t = DateTime.now();
+      expect(DateTime(m.date.year, m.date.month, m.date.day), DateTime(t.year, t.month, t.day));
+    });
+
+    test('month stats count cooked meals and leftovers eaten vs tossed', () async {
+      await cubit.addMeal(recipe(id: 'a', name: 'A'));
+      final created = await cubit.cooked(
+          meal: cubit.state.meals.single, portionsMade: 6, eatingNow: 2, freeze: 0, used: const []);
+      await cubit.eatPortion(created.single); // 1 eaten
+      await cubit.eatPortion(cubit.state.portions.single); // 2 eaten
+      await cubit.tossPortions(cubit.state.portions.single); // 2 tossed
+
+      final m = cubit.state.month;
+      expect(m.mealsCooked, 1);
+      expect(m.portionsEaten, 2);
+      expect(m.portionsTossed, 2);
+    });
+  });
 }

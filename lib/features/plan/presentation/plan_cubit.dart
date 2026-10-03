@@ -4,6 +4,7 @@ import 'package:pantrypal/features/pantry/data/repositories/pantry_repository.da
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 import 'package:pantrypal/features/plan/data/plan_repository.dart';
 import 'package:pantrypal/features/plan/domain/meal_planner.dart';
+import 'package:pantrypal/features/recipes/domain/entities/recipe.dart';
 import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:uuid/uuid.dart';
 
@@ -12,8 +13,10 @@ class PlanState extends Equatable {
   final List<PlannedMeal> meals;
   final List<PortionBatch> portions;
   final int household;
+  final PlanMonthStats month;
 
   const PlanState({
+    this.month = const PlanMonthStats(),
     this.loaded = false,
     this.meals = const [],
     this.portions = const [],
@@ -26,7 +29,7 @@ class PlanState extends Equatable {
   int get portionsLeft => portions.fold(0, (s, p) => s + p.remaining);
 
   @override
-  List<Object?> get props => [loaded, meals, portions, household];
+  List<Object?> get props => [loaded, meals, portions, household, month];
 }
 
 /// The plan → cook → portions loop, persisted locally.
@@ -49,7 +52,9 @@ class PlanCubit extends Cubit<PlanState> {
     final meals = await _plans.upcomingMeals();
     final portions = await _plans.activePortions();
     final household = await _plans.householdSize();
-    emit(PlanState(loaded: true, meals: meals, portions: portions, household: household));
+    final month = await _plans.monthStats();
+    if (isClosed) return; // screen went away while loading
+    emit(PlanState(loaded: true, meals: meals, portions: portions, household: household, month: month));
   }
 
   Future<void> setHousehold(int n) async {
@@ -76,6 +81,21 @@ class PlanCubit extends Cubit<PlanState> {
       'no_shop': drafts.where((d) => d.option.noShopping).length,
       'uses_soon': drafts.fold<int>(0, (s, d) => s + d.option.usesSoon.length),
     });
+    await load();
+  }
+
+  /// Puts one recipe on the plan for [date] (tonight by default).
+  Future<void> addMeal(Recipe recipe, {DateTime? date}) async {
+    await _plans.insertMeals([
+      PlannedMeal(
+        id: _uuid.v4(),
+        recipeId: recipe.id,
+        recipeName: recipe.name,
+        date: date ?? DateTime.now(),
+        servings: state.household,
+      ),
+    ]);
+    Analytics.track('meal_added', {'ai': recipe.isAiMade});
     await load();
   }
 
