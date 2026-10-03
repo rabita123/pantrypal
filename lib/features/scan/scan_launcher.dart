@@ -12,6 +12,7 @@ import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
 import 'package:pantrypal/features/subscription/presentation/paywall_gate.dart';
 import 'package:pantrypal/features/subscription/services/subscription_service.dart';
 import 'package:pantrypal/injection_container.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 
 /// One place that runs every way of getting food into the pantry: checks the
 /// allowance, opens the right screen, stores the result and reports back
@@ -24,7 +25,7 @@ class ScanLauncher {
       context,
       MaterialPageRoute(builder: (_) => const ScanPage()),
     );
-    return _finish(context, items, aiScan: true);
+    return _finish(context, items, aiScan: true, method: 'receipt');
   }
 
   static Future<List<PantryItem>> fridge(BuildContext context) async {
@@ -33,7 +34,7 @@ class ScanLauncher {
       context,
       MaterialPageRoute(builder: (_) => const FridgeScanPage()),
     );
-    return _finish(context, items, aiScan: true);
+    return _finish(context, items, aiScan: true, method: 'fridge');
   }
 
   /// Barcode lookups cost nothing to run, so they are never limited.
@@ -44,7 +45,7 @@ class ScanLauncher {
     );
     if (item == null || !context.mounted) return const [];
     context.read<PantryBloc>().add(PantryAddItem(item));
-    return _finish(context, [item], aiScan: false);
+    return _finish(context, [item], aiScan: false, method: 'barcode');
   }
 
   static Future<List<PantryItem>> tapPicker(BuildContext context, {String actionLabel = 'Add'}) async {
@@ -55,22 +56,25 @@ class ScanLauncher {
     if (foods == null || foods.isEmpty || !context.mounted) return const [];
     final items = foods.map((f) => QuickAdd.fromStarter(f)).toList();
     context.read<PantryBloc>().add(PantryAddItems(items));
-    return _finish(context, items, aiScan: false);
+    return _finish(context, items, aiScan: false, method: 'tap');
   }
 
   static Future<List<PantryItem>> typed(BuildContext context, String text) async {
     final items = QuickAdd.parse(text);
     if (items.isEmpty) return const [];
     context.read<PantryBloc>().add(PantryAddItems(items));
-    return _finish(context, items, aiScan: false);
+    return _finish(context, items, aiScan: false, method: 'typed');
   }
 
   static Future<List<PantryItem>> _finish(
     BuildContext context,
     List<PantryItem>? items, {
     required bool aiScan,
+    required String method,
   }) async {
     if (items == null || items.isEmpty) return const [];
+    Analytics.track('food_added', {'method': method, 'count': items.length});
+    Analytics.instance.logOnce('first_food_added', {'method': method, 'count': items.length});
     final service = sl<SubscriptionService>();
     await service.markFoodAdded();
     if (aiScan) await service.incrementScanCount();

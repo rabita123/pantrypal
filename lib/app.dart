@@ -11,6 +11,7 @@ import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
 import 'package:pantrypal/features/subscription/presentation/paywall_gate.dart';
 import 'package:pantrypal/features/subscription/services/subscription_service.dart';
 import 'package:pantrypal/injection_container.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/shared/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -61,10 +62,11 @@ class _RootPageState extends State<_RootPage> {
     if (!mounted) return;
     setState(() => _onboardingDone = done);
     final launches = await sl<SubscriptionService>().recordLaunch();
+    Analytics.track('app_open', {'launch': launches, 'onboarded': done});
     if (done) {
       await NotificationService.instance.migrateLegacyReminders();
+      _maybeShowPaywall();
       _maybeShowWeeklyReport(prefs);
-      if (launches >= 2) _maybeOfferPremium();
     }
   }
 
@@ -98,12 +100,10 @@ class _RootPageState extends State<_RootPage> {
     await prefs.setString('weekly_report_last_shown', todayKey);
   }
 
-  /// One gentle offer, on a later visit, only to someone who has already put
-  /// food in the app. Never on first launch and never on every launch.
-  Future<void> _maybeOfferPremium() async {
-    final service = sl<SubscriptionService>();
-    if (!await service.shouldShowSoftPaywall()) return;
-    await service.markSoftPaywallShown();
+  /// Shown after onboarding and on each launch for anyone not subscribed.
+  Future<void> _maybeShowPaywall() async {
+    // Premium users never see the paywall
+    if (await sl<SubscriptionService>().isPremium()) return;
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) PaywallGate.show(context);
@@ -116,9 +116,11 @@ class _RootPageState extends State<_RootPage> {
       return const Scaffold(body: SizedBox.shrink());
     }
     if (!_onboardingDone!) {
-      // No paywall here: the first session is for getting value, not a sale.
       return OnboardingPage(
-        onDone: () => setState(() => _onboardingDone = true),
+        onDone: () {
+          setState(() => _onboardingDone = true);
+          _maybeShowPaywall();
+        },
       );
     }
     return const DashboardPage();

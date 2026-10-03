@@ -8,6 +8,7 @@ import 'package:pantrypal/features/pantry/presentation/pages/pantry_page.dart';
 import 'package:pantrypal/features/pantry/presentation/pages/shopping_page.dart';
 import 'package:pantrypal/features/recipes/presentation/pages/cook_tab.dart';
 import 'package:pantrypal/features/recipes/presentation/pages/cook_tonight_page.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/shared/services/notification_service.dart';
 
 /// The shell: four tabs, each answering one question.
@@ -27,6 +28,7 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     context.read<PantryBloc>().add(PantryLoad());
     NotificationService.onNotificationTap = (_) {
+      Analytics.track('notification_opened');
       if (mounted) {
         Navigator.push(
           context,
@@ -67,7 +69,10 @@ class _DashboardPageState extends State<DashboardPage> {
           : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
+        onDestinationSelected: (i) {
+          Analytics.track('tab_viewed', {'tab': const ['use_first', 'pantry', 'cook', 'shop'][i]});
+          setState(() => _tab = i);
+        },
         backgroundColor: isDark ? AppColors.darkCard : AppColors.card,
         indicatorColor: AppColors.primarySurface,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,

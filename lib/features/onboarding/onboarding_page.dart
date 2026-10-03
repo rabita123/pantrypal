@@ -6,6 +6,7 @@ import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 import 'package:pantrypal/features/pantry/domain/services/pantry_insights.dart';
 import 'package:pantrypal/features/recipes/domain/entities/recipe.dart';
 import 'package:pantrypal/features/scan/scan_launcher.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/shared/services/notification_service.dart';
 import 'package:pantrypal/shared/widgets/added_summary.dart';
 
@@ -31,7 +32,16 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   static const _fill = 1, _result = 2, _reminders = 3;
 
+  static const _stepNames = ['welcome', 'fill', 'result', 'reminders'];
+
+  @override
+  void initState() {
+    super.initState();
+    Analytics.track('onboarding_step', {'step': 'welcome'});
+  }
+
   void _goTo(int page) {
+    Analytics.track('onboarding_step', {'step': _stepNames[page]});
     _controller.animateToPage(
       page,
       duration: const Duration(milliseconds: 350),
@@ -39,13 +49,18 @@ class _OnboardingPageState extends State<OnboardingPage> {
     );
   }
 
-  Future<void> _fillWith(Future<List<PantryItem>> Function(BuildContext) how) async {
+  Future<void> _fillWith(Future<List<PantryItem>> Function(BuildContext) how,
+      {required String method}) async {
     if (_busy) return;
+    Analytics.track('onboarding_fill_choice', {'method': method});
     setState(() => _busy = true);
     final items = await how(context);
     if (!mounted) return;
     setState(() => _busy = false);
-    if (items.isEmpty) return; // user backed out — stay on this step
+    if (items.isEmpty) {
+      Analytics.track('onboarding_fill_backed_out', {'method': method});
+      return; // user backed out — stay on this step
+    }
     final recipes = await AddedSummarySheet.loadRecipes(context);
     if (!mounted) return;
     setState(() {
@@ -58,11 +73,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
   Future<void> _finish() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_done', true);
+    Analytics.track('onboarding_completed', {'added': _added.length});
+    Analytics.instance.flush();
     widget.onDone();
   }
 
   Future<void> _enableReminders() async {
-    await NotificationService.instance.requestPermission();
+    final granted = await NotificationService.instance.requestPermission();
+    Analytics.track('notification_permission', {'granted': granted, 'where': 'onboarding'});
     await _finish();
   }
 
@@ -83,10 +101,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
           _WelcomePage(onNext: () => _goTo(_fill)),
           _FillPage(
             busy: _busy,
-            onReceipt: () => _fillWith(ScanLauncher.receipt),
-            onFridge: () => _fillWith(ScanLauncher.fridge),
-            onTap: () => _fillWith((c) => ScanLauncher.tapPicker(c)),
-            onSkip: () => _goTo(_reminders),
+            onReceipt: () => _fillWith(ScanLauncher.receipt, method: 'receipt'),
+            onFridge: () => _fillWith(ScanLauncher.fridge, method: 'fridge'),
+            onTap: () => _fillWith((c) => ScanLauncher.tapPicker(c), method: 'tap'),
+            onSkip: () {
+              Analytics.track('onboarding_fill_skipped');
+              _goTo(_reminders);
+            },
           ),
           _ResultPage(
             added: _added,

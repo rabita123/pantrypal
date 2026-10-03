@@ -75,6 +75,17 @@ class _CookTabState extends State<CookTab> {
                       style: TextStyle(color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted, fontSize: 14),
                     ),
                   ),
+                  // Up top so it is the first thing seen, not buried under the list.
+                  if (pantry.isNotEmpty)
+                    _ToolCard(
+                      highlight: true,
+                      emoji: '✨',
+                      title: 'Rescue recipe with AI',
+                      subtitle: 'Made from the food that expires first',
+                      color: AppColors.primary,
+                      isDark: isDark,
+                      onTap: () => _openAiRecipe(pantry),
+                    ),
                   if (pantry.isEmpty)
                     _EmptyCook(onAdd: () => AddFlow.start(context))
                   else if (top.isEmpty)
@@ -99,15 +110,6 @@ class _CookTabState extends State<CookTab> {
                         ),
                       ),
                   ],
-                  if (pantry.isNotEmpty)
-                    _ToolCard(
-                      emoji: '✨',
-                      title: 'Rescue recipe with AI',
-                      subtitle: 'Made from the food that expires first',
-                      color: AppColors.primary,
-                      isDark: isDark,
-                      onTap: () => _openAiRecipe(pantry),
-                    ),
                   _ToolCard(
                     emoji: '📖',
                     title: 'Browse all recipes',
@@ -183,8 +185,10 @@ class _ToolCard extends StatelessWidget {
   final String emoji, title, subtitle;
   final Color color;
   final bool isDark;
+  final bool highlight;
   final VoidCallback onTap;
   const _ToolCard({
+    this.highlight = false,
     required this.emoji,
     required this.title,
     required this.subtitle,
@@ -207,7 +211,11 @@ class _ToolCard extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+              border: Border.all(
+                color: highlight ? AppColors.primary : (isDark ? AppColors.darkBorder : AppColors.border),
+                width: highlight ? 1.5 : 1,
+              ),
+              color: highlight ? AppColors.primarySurface : null,
             ),
             child: Row(
               children: [

@@ -5,6 +5,7 @@ import 'package:pantrypal/features/recipes/data/ai_recipe_service.dart';
 import 'package:pantrypal/features/subscription/presentation/paywall_gate.dart';
 import 'package:pantrypal/features/subscription/services/subscription_service.dart';
 import 'package:pantrypal/injection_container.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 
 class AIRecipePage extends StatefulWidget {
   final List<PantryItem> pantryItems;
@@ -55,6 +56,7 @@ class _AIRecipePageState extends State<AIRecipePage> {
       final recipe = await AIRecipeService.generate(widget.pantryItems);
       // Only a recipe the user actually received counts against the free week.
       await sl<SubscriptionService>().recordRecipeGenerated();
+      Analytics.track('ai_recipe_generated');
       if (!mounted) return;
       setState(() { _recipe = recipe; _loading = false; });
     } catch (e) {

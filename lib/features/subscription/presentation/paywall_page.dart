@@ -8,6 +8,7 @@ import 'package:pantrypal/core/theme/app_theme.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/features/subscription/services/subscription_service.dart';
 
 /// Why the paywall is being shown — the headline speaks to that moment.
@@ -340,7 +341,10 @@ class _PackageOptionsState extends State<_PackageOptions> {
           final perMonth = _perMonth(p);
           final planTrial = _trialDays(p);
           return GestureDetector(
-            onTap: () => setState(() => _selected = p),
+            onTap: () {
+              Analytics.track('paywall_plan_selected', {'plan': p.packageType.name});
+              setState(() => _selected = p);
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               margin: const EdgeInsets.only(bottom: 10),
@@ -405,7 +409,10 @@ class _PackageOptionsState extends State<_PackageOptions> {
           width: double.infinity,
           height: 54,
           child: ElevatedButton(
-            onPressed: () => context.read<SubscriptionCubit>().purchase(selected),
+            onPressed: () {
+              Analytics.track('paywall_cta_tapped', {'plan': selected.packageType.name, 'trial': trial != null});
+              context.read<SubscriptionCubit>().purchase(selected);
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,

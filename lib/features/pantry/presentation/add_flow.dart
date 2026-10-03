@@ -7,6 +7,7 @@ import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/pantry/presentation/widgets/add_food_sheet.dart';
 import 'package:pantrypal/features/pantry/presentation/widgets/add_item_dialog.dart';
 import 'package:pantrypal/features/scan/scan_launcher.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/shared/widgets/added_summary.dart';
 
 /// "Add food" from anywhere: pick a way, do it, and see what it means.
@@ -22,6 +23,7 @@ class AddFlow {
       _perform(context, AddChoice(kind));
 
   static Future<void> _perform(BuildContext context, AddChoice choice) async {
+    Analytics.track('add_food_choice', {'method': choice.kind});
     List<PantryItem> added;
     switch (choice.kind) {
       case AddKind.receipt:
@@ -43,6 +45,8 @@ class AddFlow {
         );
         if (item == null || !context.mounted) return;
         context.read<PantryBloc>().add(PantryAddItem(item));
+        Analytics.track('food_added', {'method': 'manual', 'count': 1});
+        Analytics.instance.logOnce('first_food_added', {'method': 'manual', 'count': 1});
         added = [item];
     }
     if (added.isEmpty || !context.mounted) return;

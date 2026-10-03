@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:pantrypal/app.dart';
 import 'package:pantrypal/injection_container.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/shared/services/notification_service.dart';
 import 'package:pantrypal/shared/services/review_service.dart';
 
@@ -21,6 +22,7 @@ void main() async {
   ));
 
   await setupDependencies();
+  await Analytics.instance.init();
   await NotificationService.instance.init();
   await ReviewService.instance.recordSession();
 

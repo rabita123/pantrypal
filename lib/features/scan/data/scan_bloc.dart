@@ -7,6 +7,7 @@ import 'package:pantrypal/core/config/backend_config.dart';
 import 'package:pantrypal/core/utils/grocery_ocr_parser.dart';
 import 'package:pantrypal/features/pantry/domain/entities/pantry_item.dart';
 import 'package:pantrypal/features/scan/data/ai_scan_client.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:uuid/uuid.dart';
 
 abstract class ScanEvent extends Equatable {
@@ -97,6 +98,10 @@ class ScanBloc extends Bloc<ScanEvent, ScanState> {
       ScanImageSelected event, Emitter<ScanState> emit) async {
     final path = event.imagePath;
     final gen = ++_generation;
+    final started = DateTime.now();
+    int msSince() => DateTime.now().difference(started).inMilliseconds;
+    int? firstItemMs;
+    Analytics.track('scan_started', {'kind': kind});
     emit(ScanStreaming(path, ScanPhase.preparing, const [], null));
 
     // 1. AI scan — items stream in as they are found.
@@ -106,6 +111,7 @@ class ScanBloc extends Bloc<ScanEvent, ScanState> {
       await for (final u in _scanner(kind, path)) {
         if (gen != _generation) return; // cancelled — stops the request too
         items = u.items;
+        if (firstItemMs == null && items.isNotEmpty) firstItemMs = msSince();
         emit(ScanStreaming(path, u.phase, u.items, u.imageSize));
       }
     } catch (e) {
@@ -113,9 +119,21 @@ class ScanBloc extends Bloc<ScanEvent, ScanState> {
     }
     if (gen != _generation) return;
     if (items.isNotEmpty) {
+      Analytics.track('scan_completed', {
+        'kind': kind,
+        'items': items.length,
+        'unsure': items.where((m) => m['confidence'] == 'low').length,
+        'total_ms': msSince(),
+        'first_item_ms': firstItemMs,
+      });
       emit(ScanReviewReady(items, _initialSelection(items), imagePath: path));
       return;
     }
+    Analytics.track('scan_failed', {
+      'kind': kind,
+      'reason': failure != null ? 'error' : 'empty',
+      'total_ms': msSince(),
+    });
 
     // Fridge photos have no local fallback.
     if (kind == ScanKind.fridge) {
@@ -148,6 +166,7 @@ class ScanBloc extends Bloc<ScanEvent, ScanState> {
   }
 
   void _onReset(ScanReset event, Emitter<ScanState> emit) {
+    if (state is ScanStreaming) Analytics.track('scan_cancelled', {'kind': kind});
     _generation++;
     emit(ScanIdle());
   }

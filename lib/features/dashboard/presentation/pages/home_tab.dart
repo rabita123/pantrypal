@@ -13,6 +13,7 @@ import 'package:pantrypal/features/recipes/domain/services/cook_tonight_service.
 import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
 import 'package:pantrypal/features/recipes/presentation/pages/cook_tonight_page.dart';
 import 'package:pantrypal/features/settings/settings_page.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/shared/services/review_service.dart';
 import 'package:pantrypal/shared/widgets/happy_moment_sheet.dart';
 
@@ -473,6 +474,7 @@ class _UseFirstRow extends StatelessWidget {
   Future<void> _used(BuildContext context) async {
     final bloc = context.read<PantryBloc>();
     final messenger = ScaffoldMessenger.of(context);
+    Analytics.track('use_first_action', {'action': 'used', 'days_left': item.daysUntilExpiry});
     bloc.add(PantryMarkConsumed(item.id));
     messenger
       ..hideCurrentSnackBar()
@@ -492,6 +494,7 @@ class _UseFirstRow extends StatelessWidget {
 
   void _toss(BuildContext context) {
     final bloc = context.read<PantryBloc>();
+    Analytics.track('use_first_action', {'action': 'toss', 'days_left': item.daysUntilExpiry});
     bloc.add(PantryMarkWasted(item.id));
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()

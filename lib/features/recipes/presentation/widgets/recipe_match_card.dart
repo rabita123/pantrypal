@@ -5,6 +5,7 @@ import 'package:pantrypal/features/pantry/presentation/bloc/shopping_cubit.dart'
 import 'package:pantrypal/features/recipes/domain/services/cook_tonight_service.dart';
 import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
 import 'package:pantrypal/features/recipes/presentation/pages/recipe_detail_page.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 
 /// A recipe scored against the pantry: what you have, what is about to expire,
 /// and — the part that saves money — exactly what is missing, one tap from the
@@ -112,6 +113,7 @@ class RecipeMatchCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       final added = await context.read<ShoppingCubit>().addNames(missing);
+                      Analytics.track('recipe_missing_added', {'count': added});
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context)
                         ..hideCurrentSnackBar()

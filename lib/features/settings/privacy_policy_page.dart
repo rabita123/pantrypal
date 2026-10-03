@@ -12,22 +12,22 @@ class PrivacyPolicyPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text('Last updated: May 2025',
+          Text('Last updated: October 2026',
               style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted)),
           const SizedBox(height: 20),
-          _section('What We Collect', isDark,
-              'PantryPal stores all data locally on your device only. We do not collect, transmit, or share any personal data with third-party servers.\n\n'
-              '• Pantry items and expiry dates\n'
-              '• Shopping list entries\n'
-              '• Recipe data\n'
-              '• App preferences'),
+          _section('What stays on your phone', isDark,
+              'Your pantry, shopping list, recipes and preferences are stored on your device. We have no accounts and do not collect your name, email or contacts.'),
+          _section('AI scans', isDark,
+              'When you scan a receipt or fridge photo, that one photo is sent securely to our AI service to read the food in it, and the list of items comes back. PantryPal does not store the photo or use it for anything else. Barcode lookups send only the barcode number to Open Food Facts.'),
+          _section('Anonymous usage statistics', isDark,
+              'To find what is confusing and fix it, the app records which steps are used (for example "scan finished" or "paywall opened") against a random ID created on first launch. This never includes your food, photos, name, email, device or advertising ID, or your location, and is not used to track you across other apps. You can turn it off any time in Settings → Data & privacy.'),
           _section('Camera & Photos', isDark,
-              'Camera access is used solely to photograph grocery receipts for on-device text recognition (OCR). Photos are processed locally and are never uploaded or stored permanently.'),
+              'Camera access is used to photograph receipts, your fridge, and barcodes. Photos are only used for the scan you asked for.'),
           _section('Notifications', isDark,
               'Local notifications are scheduled on your device to remind you about expiring items. No notification data leaves your device.'),
           _section('Third-Party Services', isDark,
               'PantryPal uses Google Fonts, which downloads font files from Google servers on first launch. No personal data is sent. See fonts.google.com/privacy for details.\n\n'
-              'OCR text recognition is performed on-device using Google ML Kit with no data sent to external servers.'),
+              'When you are offline, receipt text is read on your phone using Google ML Kit, with nothing sent anywhere. Subscriptions are handled by Apple and RevenueCat.'),
           _section('Data Storage', isDark,
               'All pantry, shopping, and recipe data is stored in a local SQLite database and SharedPreferences on your device. Uninstalling the app removes all data.'),
           _section('Children', isDark,

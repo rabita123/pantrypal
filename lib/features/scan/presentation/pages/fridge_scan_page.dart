@@ -5,6 +5,7 @@ import 'package:pantrypal/core/theme/app_theme.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/scan/data/ai_scan_client.dart';
 import 'package:pantrypal/features/scan/data/scan_bloc.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/features/scan/presentation/widgets/scan_results_view.dart';
 import 'package:pantrypal/features/scan/presentation/widgets/scanning_view.dart';
 
@@ -66,6 +67,7 @@ class _FridgeView extends StatelessWidget {
             onRescan: () => bloc.add(ScanReset()),
             onAdd: () {
               final items = bloc.buildPantryItems(state);
+              Analytics.track('scan_confirmed', {'kind': bloc.kind, 'added': items.length, 'found': state.parsedItems.length});
               context.read<PantryBloc>().add(PantryAddItems(items));
               Navigator.pop(context, items);
             },

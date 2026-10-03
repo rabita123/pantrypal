@@ -10,6 +10,7 @@ import 'package:pantrypal/features/pantry/data/repositories/pantry_repository.da
 import 'package:pantrypal/features/subscription/presentation/paywall_gate.dart';
 import 'package:pantrypal/features/subscription/services/subscription_service.dart';
 import 'package:pantrypal/injection_container.dart';
+import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/shared/services/notification_service.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -78,7 +79,9 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 8),
 
           // ── Data ────────────────────────────────────────────────────────
-          _SectionHeader(label: 'Data', isDark: isDark),
+          _SectionHeader(label: 'Data & privacy', isDark: isDark),
+          _AnalyticsTile(isDark: isDark),
+          const SizedBox(height: 6),
           _SettingsTile(
             icon: Icons.delete_outline,
             label: 'Delete All Data',
@@ -413,7 +416,10 @@ class _RemindersTileState extends State<_RemindersTile> {
       hour: _time.hour,
       minute: _time.minute,
     );
-    if (_enabled) await NotificationService.instance.requestPermission();
+    if (_enabled) {
+      final granted = await NotificationService.instance.requestPermission();
+      Analytics.track('notification_permission', {'granted': granted, 'where': 'settings'});
+    }
     final items = await sl<PantryRepository>().getAllItems();
     await NotificationService.instance.refreshDigest(items);
   }
@@ -457,6 +463,55 @@ class _RemindersTileState extends State<_RemindersTile> {
               },
             ),
         ],
+      ),
+    );
+  }
+}
+
+
+// ── Anonymous usage stats ─────────────────────────────────────────────────────
+
+class _AnalyticsTile extends StatefulWidget {
+  final bool isDark;
+  const _AnalyticsTile({required this.isDark});
+
+  @override
+  State<_AnalyticsTile> createState() => _AnalyticsTileState();
+}
+
+class _AnalyticsTileState extends State<_AnalyticsTile> {
+  bool _on = Analytics.instance.enabled;
+
+  @override
+  void initState() {
+    super.initState();
+    Analytics.instance.init().then((_) {
+      if (mounted) setState(() => _on = Analytics.instance.enabled);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+      ),
+      child: SwitchListTile(
+        value: _on,
+        activeColor: AppColors.primary,
+        title: Text('Share anonymous usage',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: isDark ? AppColors.darkInk : AppColors.ink)),
+        subtitle: Text(
+          'Which screens get used, never your food, photos or who you are. Helps us fix what is confusing.',
+          style: TextStyle(fontSize: 12, height: 1.4, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted),
+        ),
+        onChanged: (v) {
+          setState(() => _on = v);
+          Analytics.instance.setEnabled(v);
+        },
       ),
     );
   }
