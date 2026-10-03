@@ -99,11 +99,35 @@ class CookTonightService {
 
   // Token match: "chicken breast" matches "chicken", "tomatoes" matches "tomato"
   static bool _isMatch(String ingredient, String pantryName) {
-    final a = _tokens(ingredient);
-    final b = _tokens(pantryName);
+    final a = _tokens(ingredient).toSet();
+    final b = _tokens(pantryName).toSet();
     if (a.isEmpty || b.isEmpty) return false;
-    return a.any((t) => b.contains(t));
+    if (!a.any(b.contains)) return false;
+
+    // Sharing a word is not enough when the other words make it a different
+    // product: "Cheese Crackers" is not cheese, "Coconut Milk" is not milk,
+    // "Peanut Butter" is not butter. Plain descriptors ("Chicken Breast",
+    // "Cherry Tomatoes") still match.
+    final extraA = a.difference(b);
+    final extraB = b.difference(a);
+    bool changesFood(Set<String> extra) =>
+        extra.any(_productNouns.contains) || extra.any(_foodChangers.contains);
+    return !changesFood(extraA) && !changesFood(extraB);
   }
+
+  /// Words that turn an ingredient into a different packaged product.
+  static const _productNouns = {
+    'cracker', 'chip', 'crisp', 'cake', 'cookie', 'biscuit', 'bar', 'cereal',
+    'candy', 'pie', 'pizza', 'sandwich', 'nugget', 'spread', 'dip', 'puff',
+    'pretzel', 'popcorn', 'cream', 'yogurt', 'drink', 'soda', 'jam', 'jelly',
+    'ketchup', 'mayo', 'mayonnaise', 'dressing', 'soup', 'noodle', 'bread',
+  };
+
+  /// Words that make a base food into something it cannot stand in for.
+  static const _foodChangers = {
+    'peanut', 'almond', 'cashew', 'coconut', 'oat', 'soy', 'vegan',
+    'chocolate', 'candied', 'dried', 'powdered', 'condensed', 'evaporated', 'ice',
+  };
 
   static List<String> _tokens(String name) {
     // Stop words filtered AFTER stemming so plural/stemmed forms are also caught.

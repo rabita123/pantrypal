@@ -256,4 +256,29 @@ void staplesAndRankingTests() {
       expect(results.single.missingCount, 2);
     });
   });
+
+  matchingPrecisionTests();
+}
+
+void matchingPrecisionTests() {
+  group('Matching precision', () {
+    bool m(String ingredient, String pantry) => CookTonightService.namesMatch(ingredient, pantry);
+
+    test('a different product that shares a word does not count', () {
+      expect(m('Cheese', 'Cheese Crackers'), isFalse);
+      expect(m('Milk', 'Coconut Milk'), isFalse);
+      expect(m('Butter', 'Peanut Butter'), isFalse);
+      expect(m('Milk', 'Oat Milk'), isFalse);
+      expect(m('Chocolate', 'Chocolate Cake'), isFalse);
+      expect(m('Cheese', 'Cream Cheese'), isFalse);
+    });
+
+    test('descriptors of the same food still match', () {
+      expect(m('Chicken Breast', 'Chicken'), isTrue);
+      expect(m('Tomatoes', 'Cherry Tomatoes'), isTrue);
+      expect(m('Cheddar Cheese', 'Cheese'), isTrue);
+      expect(m('Eggs', 'Free Range Eggs'), isTrue);
+      expect(m('Milk', 'Whole Milk'), isTrue);
+    });
+  });
 }

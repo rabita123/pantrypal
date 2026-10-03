@@ -330,6 +330,19 @@ class BatchPlanner {
     return math.min(wanted, slots);
   }
 
+  /// Dishes that keep and reheat well. Omelettes, salads and sandwiches are
+  /// great tonight but terrible on day four.
+  static bool isBatchFriendly(Recipe r) {
+    final n = r.name.toLowerCase();
+    return !_notForBatch.any(n.contains);
+  }
+
+  static const _notForBatch = [
+    'omelette', 'omelet', 'scrambled', 'fried egg', 'salad', 'sandwich', 'toast',
+    'smoothie', 'pancake', 'waffle', 'burger', 'pizza', 'taco', 'guacamole',
+    'chips', 'hummus', 'porridge', 'carbonara', 'sushi',
+  ];
+
   static BatchPlan plan({
     required List<Recipe> recipes,
     required List<PantryItem> pantry,
@@ -338,7 +351,11 @@ class BatchPlanner {
     required int mealsPerDay,
   }) {
     final wanted = dishCountFor(people, days, mealsPerDay);
-    final picks = MealPlanner.plan(recipes: recipes, pantry: pantry, days: wanted).map((d) => d.option).toList();
+    final picks = MealPlanner.plan(
+      recipes: recipes.where(isBatchFriendly).toList(),
+      pantry: pantry,
+      days: wanted,
+    ).map((d) => d.option).toList();
     if (picks.isEmpty) {
       return BatchPlan(people: people, days: days, mealsPerDay: mealsPerDay, dishes: const [], schedule: const []);
     }

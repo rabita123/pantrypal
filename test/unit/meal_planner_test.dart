@@ -220,4 +220,37 @@ void main() {
       expect(p.isEmpty, isTrue);
     });
   });
+
+  batchFriendlyTests();
+}
+
+void batchFriendlyTests() {
+  group('Batch-friendly dishes', () {
+    test('quick dishes that do not keep are never batch cooked', () {
+      final plan = BatchPlanner.plan(
+        recipes: [
+          recipe(id: 'o', name: 'Omelette', servings: 2, ingredients: [ingredient('Eggs'), ingredient('Cheese')]),
+          recipe(id: 'c', name: 'Chicken Curry', servings: 4, ingredients: [ingredient('Chicken'), ingredient('Rice')]),
+        ],
+        pantry: [
+          item(name: 'Eggs', category: FoodCategory.eggs, quantity: 12),
+          item(name: 'Cheese', daysFromNow: 20),
+          meat('Chicken', 2),
+          dry('Rice'),
+        ],
+        people: 2,
+        days: 4,
+        mealsPerDay: 1,
+      );
+      expect(plan.dishes.map((d) => d.option.recipe.name), ['Chicken Curry']);
+    });
+
+    test('names that keep well pass, ones that do not are filtered', () {
+      expect(BatchPlanner.isBatchFriendly(recipe(name: 'Vegetable Soup')), isTrue);
+      expect(BatchPlanner.isBatchFriendly(recipe(name: 'Spaghetti Bolognese')), isTrue);
+      expect(BatchPlanner.isBatchFriendly(recipe(name: 'Scrambled Eggs')), isFalse);
+      expect(BatchPlanner.isBatchFriendly(recipe(name: 'Greek Salad')), isFalse);
+      expect(BatchPlanner.isBatchFriendly(recipe(name: 'Grilled Cheese Sandwich')), isFalse);
+    });
+  });
 }
