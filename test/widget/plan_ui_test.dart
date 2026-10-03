@@ -132,6 +132,22 @@ void main() {
     expect(find.text('Ate 1'), findsWidgets);
   });
 
+  testWidgets('an everyday meal starts with 2 extra portions saved as leftovers', (tester) async {
+    await stockPantry(tester);
+    await tester.pumpWidget(app(const PlanTab()));
+    await settle(tester);
+    await tester.tap(find.textContaining('Plan my next'));
+    await settle(tester);
+
+    await tester.tap(find.text('Cooked it').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Done · save 2 portions'), findsOneWidget, reason: 'made 4 for 2 people → 2 leftovers');
+
+    await tester.tap(find.text('Done · save 2 portions'));
+    await settle(tester);
+    expect(find.text('Ready to eat · 2 portions'), findsOneWidget);
+  });
+
   testWidgets('batch cook plan updates instantly as choices change', (tester) async {
     await stockPantry(tester);
     await tester.pumpWidget(app(const BatchCookPage()));

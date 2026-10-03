@@ -473,6 +473,8 @@ class CookSheet extends StatefulWidget {
 }
 
 class _CookSheetState extends State<CookSheet> {
+  static const extraPortions = 2;
+
   late int _made;
   late int _eating;
   late int _freeze;
@@ -484,8 +486,10 @@ class _CookSheetState extends State<CookSheet> {
   @override
   void initState() {
     super.initState();
-    _made = widget.meal.servings.clamp(1, 40);
-    _eating = widget.meal.isBatch ? widget.household.clamp(0, _made) : _made.clamp(0, widget.household);
+    // Everyday meals start with 2 extra portions so leftovers are saved
+    // without extra taps; a batch already knows its portion count.
+    _made = (widget.meal.isBatch ? widget.meal.servings : widget.meal.servings + extraPortions).clamp(1, 40);
+    _eating = widget.household.clamp(0, _made);
     _freeze = widget.meal.freezePortions.clamp(0, _made - _eating);
     // Perishables are ticked; a bag of rice usually is not finished by one meal.
     _use = {for (final p in _items) p.id: !MealPlanner.isReusable(p)};
