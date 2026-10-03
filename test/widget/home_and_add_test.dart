@@ -6,6 +6,8 @@ import 'package:pantrypal/features/dashboard/presentation/pages/home_tab.dart';
 import 'package:pantrypal/features/pantry/data/repositories/pantry_repository.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/pantry/presentation/widgets/add_food_sheet.dart';
+import 'package:pantrypal/features/plan/data/plan_repository.dart';
+import 'package:pantrypal/features/plan/presentation/plan_cubit.dart';
 import 'package:pantrypal/features/recipes/data/repositories/recipe_repository.dart';
 import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
 
@@ -28,6 +30,7 @@ Future<void> pumpHome(WidgetTester tester) async {
         providers: [
           BlocProvider(create: (_) => PantryBloc(PantryRepository())..add(PantryLoad())),
           BlocProvider(create: (_) => RecipeBloc(RecipeRepository())..add(RecipeLoad())),
+          BlocProvider(create: (_) => PlanCubit(PlanRepository(), PantryRepository())..load()),
         ],
         child: HomeTab(onOpenPantry: () {}),
       ),

@@ -19,6 +19,15 @@ class SubscriptionService {
   /// AI photo scans (receipt or fridge) included for free, lifetime.
   static const freeScansAllowed = 5;
 
+  /// Days the free plan covers; Premium plans the whole week.
+  static const freePlanDays = 3;
+  static const premiumPlanDays = 7;
+
+  /// Build-time switch for testing Premium features on a development device:
+  /// `flutter build ios --release --dart-define=PREMIUM_PREVIEW=true`.
+  /// Never set for App Store builds.
+  static const premiumPreview = bool.fromEnvironment('PREMIUM_PREVIEW');
+
   /// AI rescue recipes included for free each week.
   static const freeRecipesPerWeek = 1;
 
@@ -104,6 +113,7 @@ class SubscriptionService {
   // ── RevenueCat ────────────────────────────────────────────────────────────
 
   Future<bool> isPremium() async {
+    if (premiumPreview) return true;
     try {
       await Purchases.invalidateCustomerInfoCache();
       final info = await Purchases.getCustomerInfo();

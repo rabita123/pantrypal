@@ -12,7 +12,7 @@ import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/features/subscription/services/subscription_service.dart';
 
 /// Why the paywall is being shown — the headline speaks to that moment.
-enum PaywallReason { general, scanLimit, recipeLimit }
+enum PaywallReason { general, scanLimit, recipeLimit, weekPlan, batchCook }
 
 class PaywallPage extends StatelessWidget {
   final PaywallReason reason;
@@ -21,6 +21,8 @@ class PaywallPage extends StatelessWidget {
   String get _headline => switch (reason) {
         PaywallReason.scanLimit => "You've used your ${SubscriptionService.freeScansAllowed} free scans",
         PaywallReason.recipeLimit => 'Want another rescue recipe?',
+        PaywallReason.weekPlan => 'Plan your whole week',
+        PaywallReason.batchCook => 'Cook once, eat all week',
         PaywallReason.general => 'Stop throwing money in the bin',
       };
 
@@ -29,6 +31,10 @@ class PaywallPage extends StatelessWidget {
           'Keep filling your pantry from a receipt or fridge photo in seconds.',
         PaywallReason.recipeLimit =>
           'The free plan includes ${SubscriptionService.freeRecipesPerWeek} AI recipe a week. Premium makes them unlimited.',
+        PaywallReason.weekPlan =>
+          'Free plans cover ${SubscriptionService.freePlanDays} days. Premium plans all 7 from what you already have.',
+        PaywallReason.batchCook =>
+          'Turn your pantry into a batch-cooking plan with portions for the fridge and freezer.',
         PaywallReason.general =>
           'Fill your pantry from a photo and get a recipe for whatever is about to expire.',
       };
@@ -175,6 +181,8 @@ class _BenefitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     const benefits = [
       (Icons.document_scanner_outlined, 'Unlimited receipt & fridge scans', 'Fill your pantry in seconds, every shop'),
+      (Icons.calendar_month_outlined, '7-day meal plans', 'Planned from what you already have'),
+      (Icons.kitchen_outlined, 'Batch cooking', 'Cook once — portions for fridge & freezer'),
       (Icons.auto_awesome_outlined, 'Unlimited AI rescue recipes', 'A dinner idea for whatever expires next'),
     ];
     final ink = isDark ? AppColors.darkInk : AppColors.ink;
@@ -223,7 +231,7 @@ class _BenefitCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Expiry reminders, Use This First, recipes and your shopping list stay free.',
+                    'Pantry, expiry reminders, 3-day plans, leftovers and your shopping list stay free.',
                     style: TextStyle(fontSize: 12, color: muted, height: 1.4),
                   ),
                 ),

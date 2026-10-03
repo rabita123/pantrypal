@@ -63,7 +63,39 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX idx_category ON ${AppConstants.itemsTable}(category)',
     );
+    await db.execute(_mealsSql);
+    await db.execute(_portionsSql);
   }
+
+
+  static const _mealsSql = '''
+      CREATE TABLE IF NOT EXISTS ${AppConstants.mealsTable} (
+        id TEXT PRIMARY KEY,
+        recipe_id TEXT NOT NULL,
+        recipe_name TEXT NOT NULL,
+        date INTEGER NOT NULL,
+        servings INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'planned',
+        batch_id TEXT,
+        freeze_portions INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      )
+  ''';
+
+  static const _portionsSql = '''
+      CREATE TABLE IF NOT EXISTS ${AppConstants.portionsTable} (
+        id TEXT PRIMARY KEY,
+        meal_id TEXT,
+        recipe_name TEXT NOT NULL,
+        total INTEGER NOT NULL,
+        remaining INTEGER NOT NULL,
+        location TEXT NOT NULL,
+        cooked_at INTEGER NOT NULL,
+        eat_by INTEGER NOT NULL,
+        tossed INTEGER NOT NULL DEFAULT 0,
+        finished_at INTEGER
+      )
+  ''';
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
@@ -71,6 +103,11 @@ class DatabaseHelper {
       await db.execute(
         'ALTER TABLE ${AppConstants.itemsTable} ADD COLUMN resolved_at INTEGER',
       );
+    }
+    if (oldVersion < 3) {
+      // Meal plans, batch cooks and the portions they leave.
+      await db.execute(_mealsSql);
+      await db.execute(_portionsSql);
     }
   }
 
@@ -315,6 +352,8 @@ class DatabaseHelper {
     final db = await database;
     await db.delete(AppConstants.itemsTable);
     await db.delete(AppConstants.shoppingTable);
+    await db.delete(AppConstants.mealsTable);
+    await db.delete(AppConstants.portionsTable);
   }
 
   // ── MAPPERS ───────────────────────────────────────────────────────────────

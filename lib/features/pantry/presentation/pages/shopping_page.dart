@@ -506,12 +506,13 @@ class _ShoppingItemTile extends StatelessWidget {
           ),
         ],
       ),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkCard : AppColors.card,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+        color: isDark ? AppColors.darkCard : AppColors.card,
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+          side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border),
         ),
         child: ListTile(
           leading: Text(foodEmoji(item.name, item.category), style: const TextStyle(fontSize: 22)),
@@ -534,6 +535,7 @@ class _ShoppingItemTile extends StatelessWidget {
             activeColor: AppColors.primary,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           ),
+        ),
         ),
       ),
     );

@@ -2,6 +2,8 @@ import 'package:get_it/get_it.dart';
 import 'package:pantrypal/features/pantry/data/repositories/pantry_repository.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/shopping_cubit.dart';
+import 'package:pantrypal/features/plan/data/plan_repository.dart';
+import 'package:pantrypal/features/plan/presentation/plan_cubit.dart';
 import 'package:pantrypal/features/recipes/data/repositories/recipe_repository.dart';
 import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
 import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
@@ -18,6 +20,8 @@ Future<void> setupDependencies() async {
   sl.registerLazySingleton<RecipeRepository>(() => RecipeRepository());
   sl.registerFactory<PantryBloc>(() => PantryBloc(sl<PantryRepository>()));
   sl.registerFactory<ShoppingCubit>(() => ShoppingCubit(sl<PantryRepository>()));
+  sl.registerLazySingleton<PlanRepository>(() => PlanRepository());
+  sl.registerFactory<PlanCubit>(() => PlanCubit(sl<PlanRepository>(), sl<PantryRepository>()));
   sl.registerFactory<RecipeBloc>(() => RecipeBloc(sl<RecipeRepository>()));
 
   await sl<RecipeRepository>().seedIfEmpty();

@@ -12,6 +12,9 @@ import 'package:pantrypal/features/recipes/domain/entities/recipe.dart';
 import 'package:pantrypal/features/recipes/domain/services/cook_tonight_service.dart';
 import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
 import 'package:pantrypal/features/recipes/presentation/pages/cook_tonight_page.dart';
+import 'package:pantrypal/features/plan/data/plan_repository.dart';
+import 'package:pantrypal/features/plan/presentation/plan_cubit.dart';
+import 'package:pantrypal/features/plan/presentation/widgets/plan_widgets.dart';
 import 'package:pantrypal/features/settings/settings_page.dart';
 import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/shared/services/review_service.dart';
@@ -21,7 +24,8 @@ import 'package:pantrypal/shared/widgets/happy_moment_sheet.dart';
 /// off, what that is worth, and what to cook with it.
 class HomeTab extends StatelessWidget {
   final VoidCallback onOpenPantry;
-  const HomeTab({super.key, required this.onOpenPantry});
+  final VoidCallback? onOpenPlan;
+  const HomeTab({super.key, required this.onOpenPantry, this.onOpenPlan});
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +38,7 @@ class HomeTab extends StatelessWidget {
           if (state is! PantryLoaded || state.allItems.isEmpty) {
             return const _EmptyHome();
           }
-          return _Content(state: state, onOpenPantry: onOpenPantry);
+          return _Content(state: state, onOpenPantry: onOpenPantry, onOpenPlan: onOpenPlan);
         },
       ),
     );
@@ -250,7 +254,8 @@ class _AltAction extends StatelessWidget {
 class _Content extends StatelessWidget {
   final PantryLoaded state;
   final VoidCallback onOpenPantry;
-  const _Content({required this.state, required this.onOpenPantry});
+  final VoidCallback? onOpenPlan;
+  const _Content({required this.state, required this.onOpenPantry, this.onOpenPlan});
 
   @override
   Widget build(BuildContext context) {
@@ -267,6 +272,25 @@ class _Content extends StatelessWidget {
       children: [
         const _Header(),
         _Hero(all: all, urgent: urgent, comingUp: comingUp),
+        // Cooked food in the fridge is the first thing to eat.
+        BlocBuilder<PlanCubit, PlanState>(
+          builder: (context, plan) {
+            final chilled = plan.portions.where((p) => p.location == PortionLocation.fridge).toList();
+            if (chilled.isEmpty) return const SizedBox.shrink();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionTitle(
+                  title: 'Eat leftovers first',
+                  trailing: onOpenPlan != null ? 'Plan' : null,
+                  onTrailing: onOpenPlan,
+                  isDark: isDark,
+                ),
+                for (final p in chilled.take(2)) PortionRow(portion: p, compact: true),
+              ],
+            );
+          },
+        ),
         BlocBuilder<RecipeBloc, RecipeState>(
           builder: (context, recipeState) {
             final recipes = recipeState is RecipeLoaded ? recipeState.all : <Recipe>[];

@@ -155,13 +155,13 @@ void main() {
       await launchApp(tester);
       expect(find.text('Use first'), findsWidgets);
       expect(find.text('Pantry'), findsWidgets);
-      expect(find.text('Cook'), findsWidgets);
+      expect(find.text('Plan'), findsWidgets);
       expect(find.text('Shop'), findsWidgets);
     });
 
     testWidgets('every bottom-nav tab opens without error', (tester) async {
       await launchApp(tester);
-      for (final tab in ['Pantry', 'Cook', 'Shop', 'Use first']) {
+      for (final tab in ['Pantry', 'Plan', 'Shop', 'Use first']) {
         await openTab(tester, tab);
         expect(tester.takeException(), isNull, reason: '$tab tab threw');
       }
@@ -284,8 +284,8 @@ void main() {
   group('E2E: recipes', () {
     testWidgets('the seeded recipe library is present', (tester) async {
       await launchApp(tester);
-      await openTab(tester, 'Cook');
-      await tester.tap(find.text('Browse all recipes'));
+      await openTab(tester, 'Plan');
+      await tester.tap(find.text('All recipes'));
       await settle(tester, timeout: const Duration(seconds: 3));
 
       expect(find.text('No recipes yet'), findsNothing,
@@ -295,8 +295,8 @@ void main() {
 
     testWidgets('recipe search narrows the list', (tester) async {
       await launchApp(tester);
-      await openTab(tester, 'Cook');
-      await tester.tap(find.text('Browse all recipes'));
+      await openTab(tester, 'Plan');
+      await tester.tap(find.text('All recipes'));
       await settle(tester, timeout: const Duration(seconds: 3));
 
       await tester.enterText(
@@ -307,8 +307,8 @@ void main() {
 
     testWidgets('opening a recipe shows its detail page', (tester) async {
       await launchApp(tester);
-      await openTab(tester, 'Cook');
-      await tester.tap(find.text('Browse all recipes'));
+      await openTab(tester, 'Plan');
+      await tester.tap(find.text('All recipes'));
       await settle(tester, timeout: const Duration(seconds: 3));
 
       final cards = find.byType(InkWell);
@@ -395,10 +395,10 @@ void main() {
       await addItemManually(tester, 'E2E Milk');
       await openTab(tester, 'Use first');
 
-      await openTab(tester, 'Cook');
+      await openTab(tester, 'Plan');
       final smart = find.text('Rescue recipe with AI');
       if (smart.evaluate().isEmpty) {
-        markTestSkipped('AI recipe entry point not on the Cook tab');
+        markTestSkipped('AI recipe entry point not on the Plan tab');
         return;
       }
       await tester.tap(smart.first);

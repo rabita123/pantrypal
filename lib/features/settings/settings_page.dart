@@ -431,12 +431,13 @@ class _RemindersTileState extends State<_RemindersTile> {
     final muted = isDark ? AppColors.darkInkMuted : AppColors.inkMuted;
     if (!_loaded) return const SizedBox(height: 56);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : AppColors.card,
+    return Material(
+      color: isDark ? AppColors.darkCard : AppColors.card,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+        side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           SwitchListTile(
@@ -493,12 +494,13 @@ class _AnalyticsTileState extends State<_AnalyticsTile> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : AppColors.card,
+    return Material(
+      color: isDark ? AppColors.darkCard : AppColors.card,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+        side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border),
       ),
+      clipBehavior: Clip.antiAlias,
       child: SwitchListTile(
         value: _on,
         activeColor: AppColors.primary,

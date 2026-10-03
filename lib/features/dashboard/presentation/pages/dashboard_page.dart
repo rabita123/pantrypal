@@ -6,14 +6,14 @@ import 'package:pantrypal/features/pantry/presentation/add_flow.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/pantry/presentation/pages/pantry_page.dart';
 import 'package:pantrypal/features/pantry/presentation/pages/shopping_page.dart';
-import 'package:pantrypal/features/recipes/presentation/pages/cook_tab.dart';
+import 'package:pantrypal/features/plan/presentation/pages/plan_tab.dart';
 import 'package:pantrypal/features/recipes/presentation/pages/cook_tonight_page.dart';
 import 'package:pantrypal/shared/services/analytics_service.dart';
 import 'package:pantrypal/shared/services/notification_service.dart';
 
 /// The shell: four tabs, each answering one question.
 ///   Use first → what needs eating?   Pantry → what do I have?
-///   Cook      → what can I make?     Shop     → what am I missing?
+///   Plan      → what will I cook?    Shop     → what am I missing?
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
   @override
@@ -51,9 +51,12 @@ class _DashboardPageState extends State<DashboardPage> {
       body: IndexedStack(
         index: _tab,
         children: [
-          HomeTab(onOpenPantry: () => setState(() => _tab = 1)),
+          HomeTab(
+            onOpenPantry: () => setState(() => _tab = 1),
+            onOpenPlan: () => setState(() => _tab = 2),
+          ),
           const PantryPage(),
-          const CookTab(),
+          const PlanTab(),
           const ShoppingPage(),
         ],
       ),
@@ -70,7 +73,7 @@ class _DashboardPageState extends State<DashboardPage> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) {
-          Analytics.track('tab_viewed', {'tab': const ['use_first', 'pantry', 'cook', 'shop'][i]});
+          Analytics.track('tab_viewed', {'tab': const ['use_first', 'pantry', 'plan', 'shop'][i]});
           setState(() => _tab = i);
         },
         backgroundColor: isDark ? AppColors.darkCard : AppColors.card,
@@ -88,9 +91,9 @@ class _DashboardPageState extends State<DashboardPage> {
             label: 'Pantry',
           ),
           NavigationDestination(
-            icon: Icon(Icons.restaurant_menu_outlined),
-            selectedIcon: Icon(Icons.restaurant_menu, color: AppColors.primary),
-            label: 'Cook',
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month, color: AppColors.primary),
+            label: 'Plan',
           ),
           NavigationDestination(
             icon: Icon(Icons.shopping_cart_outlined),

@@ -41,6 +41,14 @@ class PaywallGate {
     return false;
   }
 
+  /// True for Premium users; otherwise shows the paywall for [reason].
+  static Future<bool> ensurePremium(BuildContext context, PaywallReason reason) async {
+    if (await sl<SubscriptionService>().isPremium()) return true;
+    Analytics.track('limit_hit', {'feature': reason});
+    if (context.mounted) await show(context, reason: reason);
+    return false;
+  }
+
   /// True when an AI recipe may be generated; otherwise shows the paywall.
   static Future<bool> ensureRecipeAllowed(BuildContext context) async {
     if (await sl<SubscriptionService>().canGenerateRecipe()) return true;

@@ -6,6 +6,7 @@ import 'package:pantrypal/features/dashboard/presentation/pages/dashboard_page.d
 import 'package:pantrypal/features/onboarding/onboarding_page.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/shopping_cubit.dart';
+import 'package:pantrypal/features/plan/presentation/plan_cubit.dart';
 import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
 import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
 import 'package:pantrypal/features/subscription/presentation/paywall_gate.dart';
@@ -24,6 +25,7 @@ class PantryPalApp extends StatelessWidget {
       providers: [
         BlocProvider<PantryBloc>(create: (_) => sl<PantryBloc>()),
         BlocProvider<ShoppingCubit>(create: (_) => sl<ShoppingCubit>()),
+        BlocProvider<PlanCubit>(create: (_) => sl<PlanCubit>()..load()),
         BlocProvider<RecipeBloc>(create: (_) => sl<RecipeBloc>()),
         // Provided here so the paywall (pushed modally from anywhere) can read it
         BlocProvider<SubscriptionCubit>(create: (_) => sl<SubscriptionCubit>()..load()),
