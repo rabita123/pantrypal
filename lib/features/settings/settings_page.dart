@@ -226,7 +226,7 @@ class _PremiumBadge extends StatelessWidget {
           children: [
             Text('Premium Active', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
             SizedBox(height: 2),
-            Text('Unlimited scans & AI recipes', style: TextStyle(color: Colors.white70, fontSize: 13)),
+            Text('Unlimited scans, plans & leftover rescue', style: TextStyle(color: Colors.white70, fontSize: 13)),
           ],
         ),
       ],

@@ -20,7 +20,7 @@ class PaywallPage extends StatelessWidget {
 
   String get _headline => switch (reason) {
         PaywallReason.scanLimit => "You've used your ${SubscriptionService.freeScansAllowed} free scans",
-        PaywallReason.recipeLimit => 'Want another rescue recipe?',
+        PaywallReason.recipeLimit => 'Want more leftover ideas?',
         PaywallReason.weekPlan => 'Plan your whole week',
         PaywallReason.batchCook => 'Cook once, eat all week',
         PaywallReason.general => 'Stop throwing money in the bin',
@@ -30,13 +30,13 @@ class PaywallPage extends StatelessWidget {
         PaywallReason.scanLimit =>
           'Keep filling your pantry from a receipt or fridge photo in seconds.',
         PaywallReason.recipeLimit =>
-          'The free plan includes ${SubscriptionService.freeRecipesPerWeek} AI recipe a week. Premium makes them unlimited.',
+          'The free plan includes ${SubscriptionService.freeRecipesPerWeek} leftover rescue a week. Premium makes it unlimited.',
         PaywallReason.weekPlan =>
           'Free plans cover ${SubscriptionService.freePlanDays} days. Premium plans all 7 from what you already have.',
         PaywallReason.batchCook =>
           'Turn your pantry into a batch-cooking plan with portions for the fridge and freezer.',
         PaywallReason.general =>
-          'Fill your pantry from a photo and get a recipe for whatever is about to expire.',
+          'Fill your pantry from a photo and plan meals from whatever is about to expire.',
       };
 
   /// Money currently at risk in the user's own pantry — the honest reason to
@@ -183,7 +183,7 @@ class _BenefitCard extends StatelessWidget {
       (Icons.document_scanner_outlined, 'Unlimited receipt & fridge scans', 'Fill your pantry in seconds, every shop'),
       (Icons.calendar_month_outlined, '7-day meal plans', 'Planned from what you already have'),
       (Icons.kitchen_outlined, 'Batch cooking', 'Cook once — portions for fridge & freezer'),
-      (Icons.auto_awesome_outlined, 'Unlimited AI rescue recipes', 'A dinner idea for whatever expires next'),
+      (Icons.auto_awesome_outlined, 'Unlimited leftover rescue', '3 meal ideas for whatever needs using'),
     ];
     final ink = isDark ? AppColors.darkInk : AppColors.ink;
     final muted = isDark ? AppColors.darkInkMuted : AppColors.inkMuted;
