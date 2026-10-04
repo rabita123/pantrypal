@@ -165,4 +165,22 @@ void main() {
     expect(find.textContaining('→ 24 portions'), findsOneWidget);
     expect(find.text('Start batch cook'), findsOneWidget);
   });
+
+  replanTests();
+}
+
+void replanTests() {
+  testWidgets('re-planning with the same pantry says so instead of doing nothing visible', (tester) async {
+    await stockPantry(tester);
+    await tester.pumpWidget(app(const PlanTab()));
+    await settle(tester);
+    await tester.tap(find.textContaining('Plan my next'));
+    await settle(tester);
+
+    await tester.scrollUntilVisible(find.textContaining('Re-plan'), 200);
+    await tester.tap(find.textContaining('Re-plan'));
+    await settle(tester);
+
+    expect(find.textContaining('Already the best plan'), findsOneWidget);
+  });
 }

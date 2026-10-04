@@ -47,10 +47,30 @@ class _PlanTabState extends State<PlanTab> {
     }
     if (!mounted) return;
     setState(() => _busy = true);
+    final cubit = context.read<PlanCubit>();
+    final before = [
+      for (final m in cubit.state.regular)
+        if (m.status == MealStatus.planned) m.recipeId,
+    ];
     final draft = MealPlanner.plan(recipes: recipes, pantry: pantry, days: days);
-    await context.read<PlanCubit>().savePlan(draft);
+    await cubit.savePlan(draft);
     HapticFeedback.mediumImpact();
-    if (mounted) setState(() => _busy = false);
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    // Say what happened — an identical plan otherwise looks like a dead button.
+    if (before.isEmpty) return; // first plan: the new cards speak for themselves
+    final after = draft.map((d) => d.option.recipe.id).toList();
+    final changed = after.where((id) => !before.contains(id)).length + (before.length - after.length).clamp(0, 99);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(draft.isEmpty
+            ? 'Your pantry can\'t make a full meal right now — add a few more foods'
+            : changed == 0
+                ? 'Already the best plan for what you have. Tap Swap to try a different meal.'
+                : 'Plan updated · $changed meal${changed == 1 ? '' : 's'} changed'),
+      ));
   }
 
   Future<void> _addMissing(List<String> names) async {
