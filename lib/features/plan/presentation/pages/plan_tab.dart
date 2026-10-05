@@ -7,7 +7,11 @@ import 'package:pantrypal/features/pantry/presentation/add_flow.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/pantry_bloc.dart';
 import 'package:pantrypal/features/pantry/presentation/bloc/shopping_cubit.dart';
 import 'package:pantrypal/features/plan/data/plan_repository.dart';
+import 'package:pantrypal/core/config/backend_config.dart';
+import 'package:pantrypal/features/plan/data/rescue_service.dart';
 import 'package:pantrypal/features/plan/domain/meal_planner.dart';
+import 'package:pantrypal/features/plan/domain/plan_filler.dart';
+import 'package:pantrypal/shared/services/ai_consent.dart';
 import 'package:pantrypal/features/plan/presentation/pages/batch_cook_page.dart';
 import 'package:pantrypal/features/plan/presentation/pages/leftover_rescue_page.dart';
 import 'package:pantrypal/features/plan/presentation/plan_cubit.dart';
@@ -52,11 +56,66 @@ class _PlanTabState extends State<PlanTab> {
       for (final m in cubit.state.regular)
         if (m.status == MealStatus.planned) m.recipeId,
     ];
-    final draft = MealPlanner.plan(recipes: recipes, pantry: pantry, days: days);
+    var draft = MealPlanner.plan(recipes: recipes, pantry: pantry, days: days);
+
+    // Premium week: when the built-in recipes run out, fill the remaining
+    // days with AI meals made from the user's own food.
+    var aiAdded = 0;
+    String? aiProblem;
+    if (days > SubscriptionService.freePlanDays && draft.length < days && pantry.isNotEmpty) {
+      if (await AiConsent.ensure(context) && mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(
+            content: Text('Adding AI meal ideas for the rest of the week…'),
+            duration: Duration(seconds: 20),
+          ));
+        try {
+          final res = await PlanFiller.fill(
+            draft: draft,
+            days: days,
+            pantry: pantry,
+            start: DateTime.now(),
+            existingNames: {for (final r in recipes) r.name},
+            ideas: (picked) async => (await RescueService.ideas(
+              picked: picked,
+              pantry: pantry,
+              servings: cubit.state.household,
+            ))
+                .map((i) => i.recipe)
+                .toList(),
+          );
+          if (!mounted) return;
+          final recipeBloc = context.read<RecipeBloc>();
+          for (final r in res.added) {
+            recipeBloc.add(RecipeSave(r));
+          }
+          draft = res.plan;
+          aiAdded = res.added.length;
+          Analytics.track('plan_ai_filled', {'added': aiAdded, 'days': days});
+        } catch (e) {
+          aiProblem = BackendException.from(e).message;
+        }
+        messenger.hideCurrentSnackBar();
+      }
+    }
+
     await cubit.savePlan(draft);
     HapticFeedback.mediumImpact();
     if (!mounted) return;
     setState(() => _busy = false);
+
+    if (aiAdded > 0 || aiProblem != null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text(aiProblem != null
+              ? 'Planned ${draft.length} day${draft.length == 1 ? '' : 's'}. AI couldn\'t add more right now — try again later.'
+              : 'Planned ${draft.length} days · $aiAdded AI meal idea${aiAdded == 1 ? '' : 's'} from your food'),
+        ));
+      return;
+    }
 
     // Say what happened — an identical plan otherwise looks like a dead button.
     if (before.isEmpty) return; // first plan: the new cards speak for themselves
@@ -237,13 +296,19 @@ class _PlanTabState extends State<PlanTab> {
                                 _Wide(
                                   label: _busy
                                       ? 'Planning…'
-                                      : 'Plan my next ${week.length.clamp(1, SubscriptionService.freePlanDays)} days',
-                                  onTap: () => _createPlan(recipes, pantry, SubscriptionService.freePlanDays),
+                                      : premium
+                                          ? 'Plan my week'
+                                          : 'Plan my next ${week.length.clamp(1, SubscriptionService.freePlanDays)} days',
+                                  onTap: () => _createPlan(
+                                    recipes,
+                                    pantry,
+                                    premium ? SubscriptionService.premiumPlanDays : SubscriptionService.freePlanDays,
+                                  ),
                                 ),
-                                if (week.length > SubscriptionService.freePlanDays)
+                                if (!premium)
                                   TextButton(
                                     onPressed: () => _createPlan(recipes, pantry, SubscriptionService.premiumPlanDays),
-                                    child: Text(premium ? 'Plan all 7 days' : 'Plan all 7 days · Premium'),
+                                    child: const Text('Plan all 7 days · Premium'),
                                   ),
                               ],
                             ),

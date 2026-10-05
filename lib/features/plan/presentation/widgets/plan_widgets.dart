@@ -234,6 +234,7 @@ class PlanMealCard extends StatelessWidget {
                       if (o != null) o.recipe.timeLabel,
                       if (o != null) o.noShopping ? 'No shopping' : '${o.missingCount} to buy',
                       if (o?.recipe.kcalPerServing != null) '≈${o!.recipe.kcalPerServing} kcal',
+                      if (o != null && o.recipe.isAiMade) '✨ AI idea',
                     ].join(' · '),
                     style: TextStyle(
                       fontSize: 13,
