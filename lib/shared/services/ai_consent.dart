@@ -87,7 +87,7 @@ class _ConsentSheet extends StatelessWidget {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: ink)),
               const SizedBox(height: 12),
               point(Icons.photo_camera_outlined,
-                  'AI scans send the photo you take (receipt or fridge) to Anthropic\'s Claude AI to identify the food.'),
+                  'AI scans send the photo you take (receipt or fridge) to a third-party AI service to identify the food.'),
               point(Icons.restaurant_outlined,
                   'Leftover rescue sends the names of the foods you pick, to suggest meals.'),
               point(Icons.lock_outline,

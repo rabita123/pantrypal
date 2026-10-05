@@ -560,7 +560,7 @@ class _AiConsentTileState extends State<_AiConsentTile> {
         title: Text('AI scanning & meal ideas',
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: isDark ? AppColors.darkInk : AppColors.ink)),
         subtitle: Text(
-          'Sends scan photos and chosen food names to Anthropic\'s Claude AI. Off: receipts are read on your phone; fridge photos and Leftover rescue are unavailable.',
+          'Sends scan photos and chosen food names to a third-party AI service. Off: receipts are read on your phone; fridge photos and Leftover rescue are unavailable.',
           style: TextStyle(fontSize: 12, height: 1.4, color: isDark ? AppColors.darkInkMuted : AppColors.inkMuted),
         ),
         onChanged: (v) {
