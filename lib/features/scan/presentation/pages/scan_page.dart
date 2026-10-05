@@ -12,12 +12,14 @@ import 'package:pantrypal/features/scan/presentation/widgets/scanning_view.dart'
 import 'package:permission_handler/permission_handler.dart';
 
 class ScanPage extends StatelessWidget {
-  const ScanPage({super.key});
+  /// When false (AI not allowed), the receipt is read on the phone only.
+  final bool useAi;
+  const ScanPage({super.key, this.useAi = true});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => ScanBloc(),
+      create: (_) => ScanBloc(useAi: useAi),
       child: const _ScanView(),
     );
   }

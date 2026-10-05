@@ -18,7 +18,7 @@ class PrivacyPolicyPage extends StatelessWidget {
           _section('What stays on your phone', isDark,
               'Your pantry, shopping list, recipes and preferences are stored on your device. We have no accounts and do not collect your name, email or contacts.'),
           _section('AI scans', isDark,
-              'When you scan a receipt or fridge photo, that one photo is sent securely to our AI service to read the food in it, and the list of items comes back. PantryPal does not store the photo or use it for anything else. Barcode lookups send only the barcode number to Open Food Facts.'),
+              'Only if you allow it: when you scan a receipt or fridge photo, that one photo is sent securely to Anthropic\'s Claude AI to identify the food, and the list of items comes back. Leftover rescue sends the names of the foods you pick. PantryPal does not store the photo or use it for anything else. You can turn AI off any time in Settings → Data & privacy; receipts are then read on your phone. Barcode lookups send only the barcode number to Open Food Facts.'),
           _section('Anonymous usage statistics', isDark,
               'To find what is confusing and fix it, the app records which steps are used (for example "scan finished" or "paywall opened") against a random ID created on first launch. This never includes your food, photos, name, email, device or advertising ID, or your location, and is not used to track you across other apps. You can turn it off any time in Settings → Data & privacy.'),
           _section('Camera & Photos', isDark,

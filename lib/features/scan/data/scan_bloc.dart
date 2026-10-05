@@ -68,6 +68,9 @@ class ScanError extends ScanState {
 
 class ScanBloc extends Bloc<ScanEvent, ScanState> {
   final ScanKind kind;
+
+  /// False when the user has not allowed AI: receipts are read on the phone.
+  final bool useAi;
   final Stream<ScanUpdate> Function(ScanKind, String) _scanner;
   TextRecognizer? _recognizer;
   static const _uuid = Uuid();
@@ -77,7 +80,7 @@ class ScanBloc extends Bloc<ScanEvent, ScanState> {
   int _generation = 0;
 
   /// [scanner] is a test seam; production uses the real AI client.
-  ScanBloc({this.kind = ScanKind.receipt, Stream<ScanUpdate> Function(ScanKind, String)? scanner})
+  ScanBloc({this.kind = ScanKind.receipt, this.useAi = true, Stream<ScanUpdate> Function(ScanKind, String)? scanner})
       : _scanner = scanner ?? ((k, p) => AiScanClient.scan(k, p)),
         super(ScanIdle()) {
     on<ScanImageSelected>(_onImageSelected);
@@ -107,7 +110,7 @@ class ScanBloc extends Bloc<ScanEvent, ScanState> {
     // 1. AI scan — items stream in as they are found.
     var items = <Map<String, dynamic>>[];
     String? failure;
-    try {
+    if (useAi) try {
       await for (final u in _scanner(kind, path)) {
         if (gen != _generation) return; // cancelled — stops the request too
         items = u.items;
@@ -239,7 +242,8 @@ class ScanBloc extends Bloc<ScanEvent, ScanState> {
 
   @override
   Future<void> close() {
-    try { _recognizer?.close(); } catch (_) {}
+    // Asynchronous failures must be caught on the future, not by try/catch.
+    _recognizer?.close().catchError((_) {});
     return super.close();
   }
 }

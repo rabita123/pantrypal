@@ -91,7 +91,7 @@ class ScanResultsView extends StatelessWidget {
             if (offline)
               _Banner(
                 icon: Icons.wifi_off,
-                text: 'Offline — read on this phone, so it may be less exact. Fix anything that looks off.',
+                text: 'Read on this phone, so it may be less exact. Fix anything that looks off.',
                 color: AppColors.expiringSoon,
               ),
             if (unsure.isNotEmpty)

@@ -12,6 +12,7 @@ import 'package:pantrypal/features/subscription/bloc/subscription_cubit.dart';
 import 'package:pantrypal/features/subscription/presentation/paywall_gate.dart';
 import 'package:pantrypal/features/subscription/services/subscription_service.dart';
 import 'package:pantrypal/injection_container.dart';
+import 'package:pantrypal/shared/services/ai_consent.dart';
 import 'package:pantrypal/shared/services/analytics_service.dart';
 
 /// One place that runs every way of getting food into the pantry: checks the
@@ -20,15 +21,23 @@ import 'package:pantrypal/shared/services/analytics_service.dart';
 class ScanLauncher {
   /// Receipt and fridge pages store their own items and pop the list.
   static Future<List<PantryItem>> receipt(BuildContext context) async {
-    if (!await PaywallGate.ensureScanAllowed(context) || !context.mounted) return const [];
+    // Without AI permission the receipt is still read — on the phone, offline.
+    final ai = await AiConsent.ensure(context);
+    if (!context.mounted) return const [];
+    if (ai && (!await PaywallGate.ensureScanAllowed(context) || !context.mounted)) return const [];
     final items = await Navigator.push<List<PantryItem>>(
       context,
-      MaterialPageRoute(builder: (_) => const ScanPage()),
+      MaterialPageRoute(builder: (_) => ScanPage(useAi: ai)),
     );
-    return _finish(context, items, aiScan: true, method: 'receipt');
+    return _finish(context, items, aiScan: ai, method: ai ? 'receipt' : 'receipt_local');
   }
 
   static Future<List<PantryItem>> fridge(BuildContext context) async {
+    if (!await AiConsent.ensure(context)) {
+      if (context.mounted) _needsAi(context);
+      return const [];
+    }
+    if (!context.mounted) return const [];
     if (!await PaywallGate.ensureScanAllowed(context) || !context.mounted) return const [];
     final items = await Navigator.push<List<PantryItem>>(
       context,
@@ -64,6 +73,14 @@ class ScanLauncher {
     if (items.isEmpty) return const [];
     context.read<PantryBloc>().add(PantryAddItems(items));
     return _finish(context, items, aiScan: false, method: 'typed');
+  }
+
+  static void _needsAi(BuildContext context) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(
+        content: Text('Fridge photos need AI. You can still scan a receipt, a barcode, or tap what you have.'),
+      ));
   }
 
   static Future<List<PantryItem>> _finish(

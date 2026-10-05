@@ -161,7 +161,7 @@ void main() {
     testWidgets('offline results carry a plain warning', (tester) async {
       await tester.pumpWidget(view(offline: true));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Offline'), findsOneWidget);
+      expect(find.textContaining('Read on this phone'), findsOneWidget);
     });
   });
 

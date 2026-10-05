@@ -14,6 +14,7 @@ import 'package:pantrypal/features/recipes/presentation/bloc/recipe_bloc.dart';
 import 'package:pantrypal/features/subscription/presentation/paywall_gate.dart';
 import 'package:pantrypal/features/subscription/services/subscription_service.dart';
 import 'package:pantrypal/injection_container.dart';
+import 'package:pantrypal/shared/services/ai_consent.dart';
 import 'package:pantrypal/shared/services/analytics_service.dart';
 
 /// Leftover Rescue: pick what needs using, get three practical meals built
@@ -40,6 +41,7 @@ class _LeftoverRescuePageState extends State<LeftoverRescuePage> {
 
   Future<void> _go(List<PantryItem> pantry) async {
     if (_picked.isEmpty || _loading) return;
+    if (!await AiConsent.ensure(context) || !mounted) return;
     if (!await PaywallGate.ensureRecipeAllowed(context) || !mounted) return;
     setState(() {
       _loading = true;
