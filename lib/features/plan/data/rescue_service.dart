@@ -25,6 +25,8 @@ class RescueService {
     required List<PantryItem> picked,
     required List<PantryItem> pantry,
     required int servings,
+    String mode = 'rescue',
+    Iterable<String> avoid = const [],
     http.Client? client,
   }) async {
     final owns = client == null;
@@ -41,9 +43,17 @@ class RescueService {
               ],
               'pantry': [
                 for (final p in pantry)
-                  if (!picked.any((x) => x.id == p.id)) {'name': p.name},
+                  if (!picked.any((x) => x.id == p.id) &&
+                      // For dinners, leave snacks and drinks out of the picture.
+                      !(mode == 'plan' &&
+                          (p.category == FoodCategory.snacks || p.category == FoodCategory.beverages)))
+                    {'name': p.name},
               ],
               'servings': servings,
+              // 'plan' = filling a week: varied, everyday dinners.
+              'mode': mode,
+              // Dishes already planned, so ideas never repeat them.
+              'avoid': avoid.take(20).toList(),
             }),
           )
           .timeout(const Duration(seconds: 45));

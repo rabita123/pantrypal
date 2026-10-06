@@ -82,6 +82,8 @@ class _PlanTabState extends State<PlanTab> {
               picked: picked,
               pantry: pantry,
               servings: cubit.state.household,
+              mode: 'plan',
+              avoid: draft.map((d) => d.option.recipe.name),
             ))
                 .map((i) => i.recipe)
                 .toList(),

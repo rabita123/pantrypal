@@ -5,10 +5,16 @@ import 'package:pantrypal/features/recipes/domain/entities/recipe.dart';
 /// Premium: when the built-in recipes run out before the week does, ask the
 /// AI for meals made from the user's own food and put them on the empty days.
 class PlanFiller {
+  /// Snacks, sweets and drinks are not dinner ingredients — sending them is
+  /// how "tuna salad with cookie crumble" happens.
+  static const _notMealFood = {FoodCategory.snacks, FoodCategory.beverages, FoodCategory.condiments};
+
   /// Food to build the extra meals around: what the planned meals do not use
   /// yet, soonest-expiring first; falls back to the whole pantry.
   static List<PantryItem> pickFor(List<PlannedMealDraft> draft, List<PantryItem> pantry, {int max = 8}) {
-    final usable = pantry.where((p) => p.isActive && p.daysUntilExpiry >= 0).toList()
+    final usable = pantry
+        .where((p) => p.isActive && p.daysUntilExpiry >= 0 && !_notMealFood.contains(p.category))
+        .toList()
       ..sort((a, b) => a.expiryDate.compareTo(b.expiryDate));
     final used = {for (final d in draft) ...d.option.usedItems.map((p) => p.id)};
     final fresh = usable.where((p) => !used.contains(p.id)).toList();

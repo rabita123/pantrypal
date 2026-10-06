@@ -71,13 +71,13 @@ class PlanSummaryCard extends StatelessWidget {
           if (i.needUsingSoon > 0)
             _Line(
               emoji: '🥕',
-              text: '${i.needUsingSoon} ingredient${i.needUsingSoon == 1 ? '' : 's'} need using soon',
+              text: '${i.needUsingSoon} ingredient${i.needUsingSoon == 1 ? ' needs' : 's need'} using soon',
               trailing: i.usedSoonByPlan > 0 ? '${i.usedSoonByPlan} used here' : null,
               color: AppColors.expiringSoon,
             ),
           _Line(
             emoji: '🍳',
-            text: '${i.noShoppingMeals} meal${i.noShoppingMeals == 1 ? '' : 's'} need no shopping',
+            text: '${i.noShoppingMeals} meal${i.noShoppingMeals == 1 ? ' needs' : 's need'} no shopping',
             color: AppColors.primary,
           ),
           if (i.shoppingMeals > 0)

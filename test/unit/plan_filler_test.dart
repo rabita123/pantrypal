@@ -84,4 +84,20 @@ void main() {
     );
     expect(res.added, isEmpty);
   });
+
+  snackTests();
+}
+
+void snackTests() {
+  test('snacks, sweets and drinks are never sent to the AI as dinner ingredients', () {
+    final pantry = [
+      item(name: 'Chocolate Cookies', category: FoodCategory.snacks, daysFromNow: 1),
+      item(name: 'Cheese Crackers', category: FoodCategory.snacks, daysFromNow: 2),
+      item(name: 'Orange Juice', category: FoodCategory.beverages, daysFromNow: 1),
+      item(name: 'Canned Tuna', category: FoodCategory.meat, daysFromNow: 300),
+      item(name: 'Cherry Tomatoes', category: FoodCategory.vegetables, daysFromNow: 3),
+    ];
+    final picked = PlanFiller.pickFor(const [], pantry);
+    expect(picked.map((p) => p.name), ['Cherry Tomatoes', 'Canned Tuna']);
+  });
 }
