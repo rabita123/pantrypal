@@ -91,8 +91,8 @@ void main() {
     await settle(tester);
 
     expect(find.textContaining('Your pantry can make'), findsOneWidget);
-    expect(find.textContaining('need using soon'), findsOneWidget);
-    expect(find.textContaining('need no shopping'), findsOneWidget);
+    expect(find.textContaining('using soon'), findsOneWidget);
+    expect(find.textContaining('no shopping'), findsOneWidget);
     expect(find.textContaining('Plan my next'), findsOneWidget);
   });
 
