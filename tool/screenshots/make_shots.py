@@ -161,14 +161,15 @@ def make(name, shot_path, line1, line2, sub, tiles, corners):
     print('saved', f'{OUT}/{name}.png')
 
 
-make('01_use_first', f'{IMG}/18.png',
-     'Know What to', 'Use First',
-     "See what's expiring soon and what to cook tonight — before food goes to waste.",
-     tiles=[('⏰', 1080, 1060), ('🥕', 60, 1300), ('💰', 1080, 1780)],
-     corners=[('🥚', 1010, 2380, 300), ('🌿', -60, 2300, 320), ('🍅', -40, 1820, 190)])
+if __name__ == '__main__':
+    make('01_use_first', f'{IMG}/18.png',
+         'Know What to', 'Use First',
+         "See what's expiring soon and what to cook tonight — before food goes to waste.",
+         tiles=[('⏰', 1080, 1060), ('🥕', 60, 1300), ('💰', 1080, 1780)],
+         corners=[('🥚', 1010, 2380, 300), ('🌿', -60, 2300, 320), ('🍅', -40, 1820, 190)])
 
-make('02_plan', f'{IMG}/19.png',
-     'Plan Meals From', 'What You Have',
-     "Turn your pantry into dinners, batch cook, and buy only what's missing.",
-     tiles=[('🗓️', 60, 1080), ('🍲', 1080, 1380), ('🛒', 60, 1880)],
-     corners=[('🧄', 1040, 2330, 260), ('🌿', -70, 2340, 320), ('🥦', 1080, 1980, 190)])
+    make('02_plan', f'{IMG}/19.png',
+         'Plan Meals From', 'What You Have',
+         "Turn your pantry into dinners, batch cook, and buy only what's missing.",
+         tiles=[('🗓️', 60, 1080), ('🍲', 1080, 1380), ('🛒', 60, 1880)],
+         corners=[('🧄', 1040, 2330, 260), ('🌿', -70, 2340, 320), ('🥦', 1080, 1980, 190)])

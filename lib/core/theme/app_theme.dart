@@ -49,7 +49,10 @@ class AppColors {
 }
 
 class AppTheme {
-  static ThemeData light() {
+  /// [fontFamily] lets offline renders (store screenshots) use a locally
+  /// loaded copy of Nunito instead of fetching it.
+  static ThemeData light({String? fontFamily}) {
+    final family = fontFamily ?? GoogleFonts.nunito().fontFamily;
     return ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
@@ -61,14 +64,14 @@ class AppTheme {
         surface: AppColors.surface,
       ),
       scaffoldBackgroundColor: AppColors.surface,
-      fontFamily: GoogleFonts.nunito().fontFamily,
+      fontFamily: family,
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.ink,
         elevation: 0,
         scrolledUnderElevation: 0,
         titleTextStyle: TextStyle(
-          fontFamily: GoogleFonts.nunito().fontFamily,
+          fontFamily: family,
           fontSize: 20,
           fontWeight: FontWeight.w800,
           color: AppColors.ink,
@@ -90,7 +93,7 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           textStyle: TextStyle(
-            fontFamily: GoogleFonts.nunito().fontFamily,
+            fontFamily: family,
             fontSize: 15,
             fontWeight: FontWeight.w700,
           ),
@@ -117,7 +120,7 @@ class AppTheme {
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.primarySurface,
         labelStyle: TextStyle(
-          fontFamily: GoogleFonts.nunito().fontFamily,
+          fontFamily: family,
           fontWeight: FontWeight.w600,
           color: AppColors.primary,
         ),
@@ -126,7 +129,8 @@ class AppTheme {
     );
   }
 
-  static ThemeData dark() {
+  static ThemeData dark({String? fontFamily}) {
+    final family = fontFamily ?? GoogleFonts.nunito().fontFamily;
     return ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
@@ -138,7 +142,7 @@ class AppTheme {
         surface: AppColors.darkBg,
       ),
       scaffoldBackgroundColor: AppColors.darkBg,
-      fontFamily: GoogleFonts.nunito().fontFamily,
+      fontFamily: family,
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.darkBg,
         foregroundColor: AppColors.darkInk,
